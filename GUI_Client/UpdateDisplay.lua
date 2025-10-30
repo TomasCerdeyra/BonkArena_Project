@@ -1,4 +1,4 @@
--- Script: UpdateDisplay (VERSION 24 - Conecta el Botón de Incubación)
+-- Script: UpdateDisplay (VERSION 25 - Eliminación de la lógica de Cadencia y Crítico)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = game.Players.LocalPlayer
@@ -6,7 +6,7 @@ local Upgrades = Player:WaitForChild("Upgrades")
 local MarketplaceService = game:GetService("MarketplaceService")
 
 local UpdateStatus = ReplicatedStorage:WaitForChild("UpdateStatus")
-local RequestUpgrade = ReplicatedStorage:WaitForChild("RequestUpgrade")
+-- ELIMINAMOS la referencia a RequestUpgrade y CriticalChanceBuy
 local OpenPetHub = ReplicatedStorage:WaitForChild("OpenPetHub") 
 
 -- Evento para solicitar la compra del huevo
@@ -15,7 +15,7 @@ local RequestIncubation = ReplicatedStorage:WaitForChild("RequestIncubation")
 local Overlay = script.Parent:WaitForChild("Overlay") 
 
 local lobbyDisplay = Overlay:WaitForChild("LobbyDisplay") 
-local upgradeFireRateButton = Overlay:WaitForChild("UpgradeFireRate")
+-- ELIMINAMOS la referencia a upgradeFireRateButton
 local buyCoinsButton = Overlay:WaitForChild("Buy100Coins")
 
 -- *** REFERENCIAS DEL HUD (Progresión) ***
@@ -25,19 +25,18 @@ local xpBarContainer = progressFrame:WaitForChild("XPBarContainer")
 local xpBar = xpBarContainer:WaitForChild("XPBar")
 local xpTextLabel = progressFrame:WaitForChild("XPTextLabel")
 
-local upgradeCriticalButton = Overlay:WaitForChild("UpgradeCritical") 
+-- ELIMINAMOS la referencia a upgradeCriticalButton
 -----------------------------------------------------------------------------
 
--- GUI de Mascotas (Debe ser creada manualmente como PetHubGui)
+-- GUI de Mascotas 
 local PetHubGui = Player:WaitForChild("PlayerGui"):WaitForChild("PetHubGui")
 local PetFrame = PetHubGui:WaitForChild("PetFrame")
 local PetCloseButton = PetFrame:WaitForChild("CloseButton")
-local IncubatorButton = PetFrame:WaitForChild("IncubatorButton") -- Botón de compra/incubación
+local IncubatorButton = PetFrame:WaitForChild("IncubatorButton") 
 local PetListFrame = PetFrame:WaitForChild("PetListFrame")
 
 local PRODUCT_ID = 3439582471
-local BASE_COST_FIRERATE = 10
-local BASE_COST_CRITICAL = 25 
+-- ELIMINAMOS las constantes de costo de mejoras
 local BASE_XP_MULTIPLIER = 10 
 
 -- Constante de Costo (Copiada del PetManager)
@@ -45,11 +44,10 @@ local EGG_COST = 500
 
 local playerLevel
 local playerXP
-local fireRateLevel
-local criticalChanceLevel 
+-- ELIMINAMOS las referencias a fireRateLevel y criticalChanceLevel
 
 -- =======================================================
--- 2. FUNCIÓN DE ACTUALIZACIÓN DE ESTADO (Sin Cambios)
+-- 2. FUNCIÓN DE ACTUALIZACIÓN DE ESTADO 
 -- =======================================================
 local function onStatusUpdate(messageText)
 	lobbyDisplay.Text = messageText
@@ -58,13 +56,9 @@ UpdateStatus.OnClientEvent:Connect(onStatusUpdate)
 
 
 -- =======================================================
--- 3. FUNCIONES DE CLIC DE BOTONES / 4. COSTOS (Conexión de Incubación)
+-- 3. FUNCIONES DE CLIC DE BOTONES (Solo compra de Monedas y Mascotas)
 -- =======================================================
-local function onUpgradeFireRateClicked() RequestUpgrade:FireServer("FireRate") end
-upgradeFireRateButton.MouseButton1Click:Connect(onUpgradeFireRateClicked)
-
-local function onUpgradeCriticalClicked() RequestUpgrade:FireServer("CriticalChance") end 
-upgradeCriticalButton.MouseButton1Click:Connect(onUpgradeCriticalClicked)
+-- ELIMINAMOS las funciones onUpgradeFireRateClicked y onUpgradeCriticalClicked
 
 local function onBuyCoinsClicked() MarketplaceService:PromptProductPurchase(Player, PRODUCT_ID) end
 buyCoinsButton.MouseButton1Click:Connect(onBuyCoinsClicked)
@@ -72,7 +66,7 @@ buyCoinsButton.MouseButton1Click:Connect(onBuyCoinsClicked)
 local function onIncubatorClicked()
 	RequestIncubation:FireServer()
 end
-IncubatorButton.MouseButton1Click:Connect(onIncubatorClicked) -- CONEXIÓN CLAVE
+IncubatorButton.MouseButton1Click:Connect(onIncubatorClicked) 
 
 -- =======================================================
 -- 5. LÓGICA DE ACTUALIZACIÓN DE HUD (VISUAL Y COSTOS)
@@ -97,15 +91,7 @@ local function updateProgressBar()
 end
 
 local function updateButtonCosts()
-	-- Costo de Cadencia
-	local fireRateLevelValue = fireRateLevel.Value
-	local nextFireRateCost = BASE_COST_FIRERATE * fireRateLevelValue
-	upgradeFireRateButton.Text = string.format("Mejorar Cadencia (Costo: %d)", nextFireRateCost)
-
-	-- Costo Crítico
-	local criticalLevelValue = criticalChanceLevel.Value
-	local nextCriticalCost = BASE_COST_CRITICAL * criticalLevelValue
-	upgradeCriticalButton.Text = string.format("Mejorar Crítico (Costo: %d)", nextCriticalCost)
+	-- Toda la lógica de costo de Cadencia y Crítico ha sido ELIMINADA.
 end
 
 -- =======================================================
@@ -114,12 +100,9 @@ end
 
 playerLevel = Upgrades:WaitForChild("Level")
 playerXP = Upgrades:WaitForChild("XP")
-fireRateLevel = Upgrades:WaitForChild("FireRateLevel")
-criticalChanceLevel = Upgrades:WaitForChild("CriticalChanceLevel") 
 
 -- Conexiones de Eventos
-fireRateLevel.Changed:Connect(updateButtonCosts)
-criticalChanceLevel.Changed:Connect(updateButtonCosts) 
+-- ELIMINAMOS las conexiones de fireRateLevel y criticalChanceLevel
 playerXP.Changed:Connect(updateProgressBar) 
 playerLevel.Changed:Connect(updateProgressBar)
 
@@ -131,7 +114,7 @@ end)
 -- Actualizar el texto del botón de incubación
 IncubatorButton.Text = string.format("INCUBAR HUEVO (%d BC)", EGG_COST)
 
-updateButtonCosts() 
+updateButtonCosts() -- La llamamos, pero ahora está vacía
 updateProgressBar()
 
 -- =======================================================
@@ -142,3 +125,4 @@ local OpenPetHub = ReplicatedStorage:WaitForChild("OpenPetHub")
 OpenPetHub.OnClientEvent:Connect(function()
 	PetHubGui.Enabled = true
 end)
+-- ELIMINAMOS el 'return module' para mantener la estructura original.

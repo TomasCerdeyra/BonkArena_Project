@@ -1,10 +1,11 @@
--- Script: DataStoreManager (VERSION 1 - Centralizando DataStore Logic)
+-- Script: DataStoreManager (VERSION 2 - Limpieza de Cadencia/Crítico y Añadir Báculos)
 
 local DataStoreService = game:GetService("DataStoreService")
 
 -- Definición de las DataStores usadas en el juego
 local PLAYER_DATA_STORE = DataStoreService:GetDataStore("PlayerData_V1") 
 local PET_INVENTORY_STORE = DataStoreService:GetDataStore("PetInventory_V1") 
+local STAFF_INVENTORY_STORE = DataStoreService:GetDataStore("StaffInventory_V1") -- NUEVO
 
 local DataStoreManager = {}
 
@@ -41,6 +42,18 @@ function DataStoreManager.loadData(player)
 		warn("DataStore Error: Failed to load PetInventory for " .. player.Name .. ": " .. data2)
 	end
 
+	-- NUEVO: Cargar inventario de báculos
+	local success3, data3 = pcall(function()
+		return STAFF_INVENTORY_STORE:GetAsync(userId)
+	end)
+	if success3 then
+		results.StaffData = data3
+	else
+		success = false
+		errors.StaffData = data3
+		warn("DataStore Error: Failed to load StaffInventory for " .. player.Name .. ": " .. data3)
+	end
+
 	return success, results, errors
 end
 
@@ -54,8 +67,9 @@ function DataStoreManager.saveData(player)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local upgrades = player:FindFirstChild("Upgrades")
 	local petInventory = player:FindFirstChild("PetInventory")
+	local staffInventory = player:FindFirstChild("StaffInventory") -- NUEVO
 
-	if not (leaderstats and upgrades and petInventory) then 
+	if not (leaderstats and upgrades and petInventory and staffInventory) then 
 		warn("DataStore Error: Missing data folders for saving player " .. player.Name)
 		return false
 	end
@@ -63,17 +77,23 @@ function DataStoreManager.saveData(player)
 	-- Recopilación de PlayerData (BonkCoins, Nivel, Upgrades)
 	local playerDataToSave = {
 		BonkCoin = leaderstats.BonkCoin.Value,
-		FireRateLevel = upgrades.FireRateLevel.Value,
-		CriticalChanceLevel = upgrades.CriticalChanceLevel.Value, 
+		-- FireRateLevel ELIMINADO
+		-- CriticalChanceLevel ELIMINADO
 		Level = upgrades.Level.Value, 
-		XP = upgrades.XP.Value        
+		XP = upgrades.XP.Value,
+		EquippedStaff = upgrades.EquippedStaff.Value -- NUEVO
 	}
 
 	-- Recopilación de PetInventory
 	local petsToSave = {}
 	for _, petValue in ipairs(petInventory:GetChildren()) do
-		-- Guardamos el nombre y el multiplicador de la mascota
 		petsToSave[petValue.Name] = petValue.Value
+	end
+
+	-- NUEVO: Recopilación de StaffInventory
+	local staffsToSave = {}
+	for _, staffValue in ipairs(staffInventory:GetChildren()) do
+		staffsToSave[staffValue.Name] = staffValue.Value -- Guardamos true/false
 	end
 
 	-- ----------------------------------------------------
@@ -93,6 +113,15 @@ function DataStoreManager.saveData(player)
 	if not success2 then
 		success = false
 		warn("DataStore Error: Failed to save PetInventory for " .. player.Name .. ": " .. err2)
+	end
+
+	-- NUEVO: Guardar Báculos
+	local success3, err3 = pcall(function()
+		STAFF_INVENTORY_STORE:SetAsync(userId, staffsToSave)
+	end)
+	if not success3 then
+		success = false
+		warn("DataStore Error: Failed to save StaffInventory for " .. player.Name .. ": " .. err3)
 	end
 
 	return success

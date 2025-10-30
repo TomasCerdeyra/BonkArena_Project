@@ -1,21 +1,51 @@
--- Script: SoundHandler (VERSION 3 - Añadiendo Sonido Crítico)
+-- Script: SoundHandler (VERSION 4 - Carga Robusta de Sonidos)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Debris = game:GetService("Debris")
 
--- Plantillas de Sonido (MODIFICADO)
-local Sounds = {
-	["Shoot"] = ReplicatedStorage:WaitForChild("Sfx_Shoot"),
-	["Hit"] = ReplicatedStorage:WaitForChild("Sfx_Hit"),
-	["CriticalHit"] = ReplicatedStorage:WaitForChild("Sfx_CriticalHit") -- NUEVO
-}
+-- Inicialmente nulo. Se llenará al primer uso.
+local SoundCache = {} 
 
 local SoundHandler = {}
 
--- Función para reproducir un sonido en una posición específica (sin cambios)
+-- Función auxiliar para inicializar la tabla SoundCache
+local function initializeSoundCache()
+	-- Solo inicializar una vez
+	if next(SoundCache) == nil then 
+		local soundsFolder = game.ReplicatedStorage:FindFirstChild("Sounds")
+
+		if soundsFolder then
+			for _, sound in pairs(soundsFolder:GetChildren()) do
+				if sound:IsA("Sound") then
+					-- Almacenamos el sonido por su nombre (Ej: "Shoot", "Hit")
+					SoundCache[sound.Name] = sound
+				end
+			end
+		else
+			warn("SoundHandler: La carpeta 'Sounds' en ReplicatedStorage no fue encontrada. Los sonidos no funcionarán.")
+		end
+	end
+end
+
+
 function SoundHandler.playSound(soundName, position)
-	local soundTemplate = Sounds[soundName]
+	-- Inicializamos el caché de sonidos al primer uso
+	initializeSoundCache()
+
+	-- El CombatHandler llama a playSound("Shoot"), pero el archivo de sonido
+	-- es Sfx_Shoot. Necesitamos mapear si no está en la caché.
+
+	local nameToFind = soundName
+	if soundName == "Shoot" and not SoundCache[soundName] and SoundCache["Sfx_Shoot"] then
+		nameToFind = "Sfx_Shoot"
+	elseif soundName == "Hit" and not SoundCache[soundName] and SoundCache["Sfx_Hit"] then
+		nameToFind = "Sfx_Hit"
+	elseif soundName == "CriticalHit" and not SoundCache[soundName] and SoundCache["Sfx_CriticalHit"] then
+		nameToFind = "Sfx_CriticalHit"
+	end
+
+	local soundTemplate = SoundCache[nameToFind]
 
 	if soundTemplate then
 		local soundClone = soundTemplate:Clone()
@@ -31,12 +61,18 @@ function SoundHandler.playSound(soundName, position)
 
 		-- Hacemos que el sonido sea hijo de la parte
 		soundClone.Parent = soundPart
+		-- CRÍTICO: Asegurar que el sonido tenga el ID antes de reproducir
+		if soundTemplate.SoundId ~= "" then
+			soundClone.SoundId = soundTemplate.SoundId
+		end
 
 		-- Reproducimos el sonido
 		soundClone:Play()
 
 		-- Autodestruir la PARTE
-		Debris:AddItem(soundPart, soundClone.TimeLength + 0.1) 
+		Debris:AddItem(soundPart, soundClone.TimeLength > 0 and soundClone.TimeLength + 0.1 or 1) -- Evitar error si TimeLength es 0
+	else
+		warn("SoundHandler: El sonido '" .. soundName .. "' no se encontró.")
 	end
 end
 

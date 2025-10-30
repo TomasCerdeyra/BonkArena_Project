@@ -1,11 +1,11 @@
--- Script: GameHandler (VERSION 46 - Inicialización Completa de Handlers)
+-- Script: GameHandler (VERSION 47 - Inicialización Completa de Handlers y StaffManager)
 
 -- =======================================================
 -- 1. SERVICIOS Y CONFIGURACIÓN
 -- =======================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game.Players
--- REQUIRES CRÍTICOS (con las nuevas rutas de carpetas)
+-- REQUIRES CRÍTICOS
 local TeleportHandler = require(game.ServerScriptService.Modules.TeleportHandler)
 local EnemyHandler = require(game.ServerScriptService.Modules.EnemyHandler)
 local ZoneManager = require(game.ServerScriptService.Modules.ZoneManager) 
@@ -13,7 +13,7 @@ local ZoneManager = require(game.ServerScriptService.Modules.ZoneManager)
 -- ¡CRÍTICO! INICIALIZAR TODOS LOS LISTENERS
 local PetHubHandler = require(game.ServerScriptService.Pets.PetHubHandler)
 local RewardManager = require(game.ServerScriptService.Economy.RewardManager)
-
+local StaffManager = require(game.ServerScriptService.Modules.StaffManager) -- NUEVO REQUIRE
 
 -- =======================================================
 -- 2. CONFIGURACIÓN CENTRAL
@@ -50,3 +50,6 @@ Players.PlayerAdded:Connect(onPlayerAdded)
 
 -- Iniciar el Manager de Zonas
 task.spawn(manageZones)
+
+-- CRÍTICO: Inicializar StaffManager (conecta RemoteEvents y PlayerAdded listeners)
+StaffManager.init()

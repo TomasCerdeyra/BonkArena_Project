@@ -1,4 +1,4 @@
--- Script: ArenaGuiHandler (VERSION 7 - Corrección de Ámbito y Conexión Final)
+-- Script: ArenaGuiHandler (VERSION 9 - Corrigiendo Ubicación del Botón de Retiro)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,6 +26,7 @@ local RequestTeleport
 local OpenPetHub
 local RequestIncubation
 local RequestEquipPet 
+local RetreatToLobby -- RemoteEvent de Retiro
 
 
 -- Datos de Configuración de Arenas (Orden Fijo para la Torre)
@@ -49,8 +50,16 @@ local function onEquipPetClicked(petName)
 	RequestEquipPet:FireServer(petName)
 end
 
+-- NUEVO: Función para manejar el clic en el botón de Retiro
+local function onRetreatClicked()
+	print("GUI: Botón de Retiro Seguro clickeado. Notificando al servidor.")
+	RetreatToLobby:FireServer() 
+	RetreatButton.Visible = false -- Ocultar inmediatamente después de enviar
+	-- NO DESHABILITAMOS EL SCREEN GUI PRINCIPAL AQUÍ, lo hace el servidor al teletransportar.
+end
+
 local function generateArenaButtons()
-	-- ... (definición completa de generateArenaButtons)
+	-- ... (Código existente para generar botones)
 	ArenaTemplate.Visible = false 
 
 	for _, item in ipairs(ArenaListContainer:GetChildren()) do
@@ -85,6 +94,8 @@ local function generateArenaButtons()
 			if isUnlocked then
 				ArenaSelectionGui.Enabled = false
 				RequestTeleport:FireServer(zoneName) 
+				-- CRÍTICO: El botón de retiro DEBE aparecer aquí, ya que el jugador está en la arena.
+				RetreatButton.Visible = true 
 			else
 				print("GUI: Arena bloqueada. Nivel necesario: " .. requiredLevel)
 			end
@@ -95,7 +106,7 @@ local function generateArenaButtons()
 end
 
 local function generatePetButtons()
-	-- ... (definición completa de generatePetButtons)
+	-- ... (Código existente para generar botones de mascotas)
 	PetItemTemplate.Visible = false 
 
 	-- Limpiar botones antiguos (clones)
@@ -142,6 +153,8 @@ end
 local function openSelector()
 	generateArenaButtons() 
 	ArenaSelectionGui.Enabled = true
+	-- Si el botón de retiro estaba visible (ya está en una arena), ocultarlo al abrir el selector.
+	RetreatButton.Visible = false 
 end
 
 local function openPetHub()
@@ -160,6 +173,7 @@ local function initializeReferences()
 	OpenPetHub = ReplicatedStorage:WaitForChild("OpenPetHub")
 	RequestIncubation = ReplicatedStorage:WaitForChild("RequestIncubation")
 	RequestEquipPet = ReplicatedStorage:WaitForChild("RequestEquipPet")
+	RetreatToLobby = ReplicatedStorage:WaitForChild("RetreatToLobby") -- RemoteEvent de Retiro
 
 	-- 2. Inicializar GUI (Usando PlayerGui)
 	local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -168,6 +182,10 @@ local function initializeReferences()
 	ArenaListContainer = SelectionFrame:WaitForChild("ArenaListContainer")
 	CloseButton = SelectionFrame:WaitForChild("CloseButton")
 	ArenaTemplate = ArenaListContainer:WaitForChild("ArenaTemplate")
+
+	-- CRÍTICO: Nueva ruta del botón de retiro (ahora es hijo de MainGui)
+	local MainGui = PlayerGui:WaitForChild("MainGui") 
+	RetreatButton = MainGui:WaitForChild("RetreatButton") 
 
 	PetHubGui = PlayerGui:WaitForChild("PetHubGui")
 	PetFrame = PetHubGui:WaitForChild("PetFrame")
@@ -183,7 +201,14 @@ local function initializeReferences()
 	-- 4. Inicializar las conexiones de eventos de la GUI
 	IncubatorButton.MouseButton1Click:Connect(onIncubatorClicked) 
 	PetCloseButton.MouseButton1Click:Connect(function() PetHubGui.Enabled = false end)
-	CloseButton.MouseButton1Click:Connect(function() ArenaSelectionGui.Enabled = false end)
+	CloseButton.MouseButton1Click:Connect(function() 
+		ArenaSelectionGui.Enabled = false 
+		-- Al cerrar el selector, aseguramos que el botón de retiro se oculte si no estamos en la arena.
+		RetreatButton.Visible = false
+	end)
+
+	-- CRÍTICO: Conexión del botón de retiro
+	RetreatButton.MouseButton1Click:Connect(onRetreatClicked) 
 
 	OpenArenaSelector.OnClientEvent:Connect(openSelector)
 	OpenPetHub.OnClientEvent:Connect(openPetHub)

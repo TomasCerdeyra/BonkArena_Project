@@ -1,10 +1,9 @@
--- Script: PlayerStats (VERSION 11 - Refactorizado: Inicializador de Jugadores)
+-- Script: PlayerStats (VERSION 13 - Añadiendo StaffInventory)
 
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
-local DataStoreManager = require(ServerScriptService.Persistence.DataStoreManager) -- Módulo central de persistencia
+local DataStoreManager = require(ServerScriptService.Persistence.DataStoreManager) 
 
--- Función auxiliar para la creación de todas las estructuras necesarias
 local function initializeStats(player)
 	-- CREACIÓN DE ESTRUCTURAS BÁSICAS
 	local leaderstats = Instance.new("Folder")
@@ -18,13 +17,7 @@ local function initializeStats(player)
 	upgrades.Name = "Upgrades"
 	upgrades.Parent = player
 
-	local fireRateLevel = Instance.new("IntValue")
-	fireRateLevel.Name = "FireRateLevel"
-	fireRateLevel.Parent = upgrades
-
-	local criticalChanceLevel = Instance.new("IntValue")
-	criticalChanceLevel.Name = "CriticalChanceLevel"
-	criticalChanceLevel.Parent = upgrades
+	-- FireRateLevel y CriticalChanceLevel ELIMINADOS
 
 	local playerLevel = Instance.new("IntValue")
 	playerLevel.Name = "Level"
@@ -38,10 +31,26 @@ local function initializeStats(player)
 	coinMultiplierStat.Name = "CoinMultiplier"
 	coinMultiplierStat.Parent = upgrades
 
+	-- Báculo Equipado
+	local equippedStaff = Instance.new("StringValue")
+	equippedStaff.Name = "EquippedStaff"
+	equippedStaff.Value = "BasicStaff" -- Báculo inicial por defecto
+	equippedStaff.Parent = upgrades
+
 	-- Carpeta para almacenar el inventario de mascotas (datos)
 	local petInventory = Instance.new("Folder")
 	petInventory.Name = "PetInventory"
 	petInventory.Parent = player
+
+	-- NUEVO: Carpeta para el inventario de Báculos
+	local staffInventory = Instance.new("Folder")
+	staffInventory.Name = "StaffInventory"
+	staffInventory.Parent = player
+	-- Añadimos el Báculo Básico al inventario por defecto
+	local basicStaffOwned = Instance.new("BoolValue")
+	basicStaffOwned.Name = "BasicStaff"
+	basicStaffOwned.Value = true
+	basicStaffOwned.Parent = staffInventory
 end
 
 local function onPlayerAdded(player)
@@ -51,19 +60,26 @@ local function onPlayerAdded(player)
 	-- 2. Delegar la carga de datos
 	local success, loadedData = DataStoreManager.loadData(player)
 
+	local leaderstats = player:FindFirstChild("leaderstats")
 	local upgrades = player:FindFirstChild("Upgrades")
 	local petInventory = player:FindFirstChild("PetInventory")
+	local staffInventory = player:FindFirstChild("StaffInventory") -- Referencia al nuevo inventario
 
 	if success and loadedData.PlayerData then
 		local data = loadedData.PlayerData
 
-		-- Cargar PlayerData
-		player.leaderstats.BonkCoin.Value = data.BonkCoin or 0
-		upgrades.FireRateLevel.Value = data.FireRateLevel or 1
-		upgrades.CriticalChanceLevel.Value = data.CriticalChanceLevel or 1
+		if not (leaderstats and upgrades and petInventory and staffInventory) then 
+			warn("PlayerStats: Faltan carpetas de datos para " .. player.Name)
+			return 
+		end
+
+		-- Cargar PlayerData (Eliminando referencias antiguas)
+		leaderstats.BonkCoin.Value = data.BonkCoin or 0
+		-- ELIMINAMOS: FireRateLevel y CriticalChanceLevel
 		upgrades.Level.Value = data.Level or 1 
 		upgrades.XP.Value = data.XP or 0
-		upgrades.CoinMultiplier.Value = 1.0 
+		upgrades.CoinMultiplier.Value = data.CoinMultiplier or 1.0 
+		upgrades.EquippedStaff.Value = data.EquippedStaff or "BasicStaff" -- NUEVO: Cargar báculo equipado
 
 		print("PlayerData cargada para " .. player.Name)
 
@@ -79,14 +95,31 @@ local function onPlayerAdded(player)
 			print("Inventario de mascotas cargado para " .. player.Name)
 		end
 
+		-- Cargar StaffInventory (NUEVO)
+		local staffData = loadedData.StaffData
+		if staffData and type(staffData) == "table" then
+			-- Solo recreamos los que no son el BasicStaff (ya creado si es la primera vez)
+			for staffName, isOwned in pairs(staffData) do
+				local staffOwned = staffInventory:FindFirstChild(staffName)
+				if not staffOwned then
+					staffOwned = Instance.new("BoolValue")
+					staffOwned.Name = staffName
+					staffOwned.Parent = staffInventory
+				end
+				staffOwned.Value = isOwned
+			end
+			print("Inventario de báculos cargado para " .. player.Name)
+		end
+
+
 	else
 		-- Inicializar valores por defecto si la carga falla o es la primera vez
-		player.leaderstats.BonkCoin.Value = 0
-		upgrades.FireRateLevel.Value = 1
-		upgrades.CriticalChanceLevel.Value = 1
+		leaderstats.BonkCoin.Value = 0
+		-- ELIMINAMOS: FireRateLevel y CriticalChanceLevel
 		upgrades.Level.Value = 1
 		upgrades.XP.Value = 0
 		upgrades.CoinMultiplier.Value = 1.0
+		upgrades.EquippedStaff.Value = "BasicStaff"
 
 		print("Creando nuevos datos/valores por defecto para " .. player.Name)
 	end
