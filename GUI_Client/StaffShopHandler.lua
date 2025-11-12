@@ -43,7 +43,7 @@ local function generateStaffButtons()
 		return
 	end
 
-	-- Recorrer la configuración de báculos 
+	-- Recorrer la configuración de báculos 
 	for staffId, data in pairs(staffConfigData) do
 
 		local button = StaffButtonTemplate:Clone()
@@ -51,7 +51,7 @@ local function generateStaffButtons()
 		button.Visible = true
 		button.Parent = StaffListContainer
 
-		-- Referencias a los labels de la plantilla 
+		-- Referencias a los labels de la plantilla 
 		local nameLabel = button:WaitForChild("StaffNameLabel")
 		local statsLabel = button:WaitForChild("StatsLabel")
 		local priceButton = button:WaitForChild("PriceButton")
@@ -65,33 +65,46 @@ local function generateStaffButtons()
 		local isOwned = StaffInventory:FindFirstChild(staffId)
 		local isEquipped = (equippedStaffValue.Value == staffId)
 
+		-- Desconectamos los clics para el PriceButton y reasignamos con la lógica correcta
+		if connections[staffId] then 
+			connections[staffId]:Disconnect() 
+		end
+
+		local actionType = "" -- Define si la acción será Comprar o Equipar
+
 		if isEquipped then
 			-- Báculo equipado actualmente
 			statusLabel.Text = "(EQUIPADO)"
 			priceButton.Text = "EQUIPADO"
 			priceButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100) -- Gris
-			priceButton.Active = false 
+			priceButton.Active = false
+			actionType = "None" 
 
 		elseif isOwned then
 			-- Báculo poseído, pero no equipado
 			statusLabel.Text = "(POSEÍDO)"
 			priceButton.Text = "EQUIPAR"
 			priceButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0) -- Verde
-			priceButton.Active = true 
-
-			priceButton.MouseButton1Click:Connect(function()
-				RequestEquipStaff:FireServer(staffId)
-			end)
+			priceButton.Active = true
+			actionType = "Equip"
 
 		else
 			-- Báculo no poseído (Comprable)
 			statusLabel.Text = ""
 			priceButton.Text = "COMPRAR: " .. data.Cost
 			priceButton.BackgroundColor3 = Color3.fromRGB(0, 85, 255) -- Azul
-			priceButton.Active = true 
+			priceButton.Active = true
+			actionType = "Buy"
+		end
 
-			priceButton.MouseButton1Click:Connect(function()
-				RequestStaffBuy:FireServer(staffId)
+		-- 3. ÚNICA CONEXIÓN DE EVENTO DEL BOTÓN (Maneja las 3 acciones)
+		if actionType ~= "None" then
+			connections[staffId] = priceButton.MouseButton1Click:Connect(function()
+				if actionType == "Buy" then
+					RequestStaffBuy:FireServer(staffId)
+				elseif actionType == "Equip" then
+					RequestEquipStaff:FireServer(staffId) -- <--- ESTO AHORA DEBERÍA DISPARAR "EmberWand"
+				end
 			end)
 		end
 	end

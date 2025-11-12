@@ -6,7 +6,8 @@ local UpdateStatus = ReplicatedStorage:WaitForChild("UpdateStatus")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ZoneManager = require(ServerScriptService.Modules.ZoneManager) 
 
-local LobbyFloor = Workspace:WaitForChild("LobbyFloor")
+local LobbyModel = Workspace:WaitForChild("Lobby")
+local LobbyFloor = LobbyModel:WaitForChild("LobbyFloor")
 local MediumArenaFloor = Workspace:WaitForChild("MediumArenaFloor")
 local ArenaFloor = Workspace:WaitForChild("ArenaFloor") 
 
@@ -36,7 +37,7 @@ function module.teleportToZone(player, zoneName)
 	end
 
 	if playerLevel < zoneData.MinimumLevel then
-		UpdateStatus:FireClient(player, 
+		UpdateStatus:FireClient(player,
 			"ERROR: Necesitas Nivel " .. zoneData.MinimumLevel .. " para acceder a " .. zoneName)
 		return
 	end
@@ -44,18 +45,33 @@ function module.teleportToZone(player, zoneName)
 	local targetFloorPart = zoneData.FloorPart
 	local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
 
-	if humanoidRootPart and targetFloorPart then
-		local ARENA_RADIUS = 70 
-		local SPAWN_HEIGHT = 5
+	-- **CRÍTICO: Obtener la posición central de forma segura**
+	local center
+	if targetFloorPart:IsA("Model") then
+		if targetFloorPart.PrimaryPart then
+			center = targetFloorPart.PrimaryPart.Position
+		else
+			warn("TeleportHandler: Modelo '" .. zoneName .. "' no tiene PrimaryPart configurada.")
+			return
+		end
+	elseif targetFloorPart:IsA("BasePart") then
+		center = targetFloorPart.Position
+	else
+		warn("TeleportHandler: Objeto de zona '" .. zoneName .. "' no es ni Modelo ni BasePart.")
+		return
+	end
 
-		local center = targetFloorPart.Position
+	if humanoidRootPart and center then
+		local ARENA_RADIUS = 70
+		local SPAWN_HEIGHT = 5 -- Usaremos la misma altura que ya tienes para el jugador
+
 		local angle = math.random() * 2 * math.pi
 		local offsetX = math.cos(angle) * ARENA_RADIUS
 		local offsetZ = math.sin(angle) * ARENA_RADIUS
 
 		local arenaSpawnPos = Vector3.new(
-			center.X + offsetX, 
-			center.Y + SPAWN_HEIGHT, 
+			center.X + offsetX,
+			center.Y + SPAWN_HEIGHT,
 			center.Z + offsetZ
 		)
 
@@ -76,8 +92,6 @@ function module.teleportToLobby(player)
 
 	local character = player.Character
 	if character then
-		-- Limpiar enemigos que lo esten persiguiendo (usando el nombre de V38)
-		EnemyHandler.despawnAllEnemies() 
 
 		local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
 		if humanoidRootPart then

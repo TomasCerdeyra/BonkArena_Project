@@ -11,9 +11,33 @@ PetManager.EGG_COST = 500
 
 -- Configuración de las mascotas disponibles y sus probabilidades
 PetManager.PetConfig = {
-	["CommonRabbit"] = { Multiplier = 1.05, Chance = 0.60, ModelId = "rbxassetid://CommonRabbitId" }, 
-	["RareWolf"] =     { Multiplier = 1.15, Chance = 0.30, ModelId = "rbxassetid://RareWolfId" },     
-	["EpicDragon"] =   { Multiplier = 1.30, Chance = 0.10, ModelId = "rbxassetid://EpicDragonId" },   
+	-- Mascotas NO animadas (deben tener un ModelId correcto en ReplicatedStorage)
+	["CommonRabbit"] = { Multiplier = 1.05, Chance = 0, ModelId = "CommonRabbit", AnimationId = "" }, 
+	["RareWolf"] = { Multiplier = 1.15, Chance = 0, ModelId = "RareWolf", AnimationId = "" },
+	["EpicDragon"] = { Multiplier = 1.30, Chance = 0, ModelId = "EpicDragon", AnimationId = "" }, 
+
+	-- ¡TU MASCOTA ANIMADA! (Usando tu Asset ID)
+	-- NOTA: Asegúrate de que el ModelId ("TortugaConAlas") coincide con el nombre del modelo en ReplicatedStorage
+	--       y que "TortugaConAlas" sea el nombre del NumberValue en el PetInventory.
+	["TortugaConAlas"] = { 
+		Multiplier = 2.05, -- Ejemplo de multiplicador, ajústalo según necesites
+		Chance = 0.05, 
+		ModelId = "TortugaConAlas", 
+		AnimationId = "rbxassetid://120306152637743" 
+	},
+	["Pulpo"] = { 
+		Multiplier = 0.05, -- Ejemplo de multiplicador, ajústalo según necesites
+		Chance = 0, 
+		ModelId = "Pulpo", 
+		AnimationId = "" 
+	},
+	["Hada"] = { 
+		Multiplier = 0.05, -- Ejemplo de multiplicador, ajústalo según necesites
+		Chance = 10, 
+		ModelId = "Hada", 
+		AnimationId = "" 
+	},
+	
 }
 PetManager.MAX_EQUIPPED_PETS = 1
 
@@ -66,12 +90,14 @@ end
 -- IMPLEMENTACIÓN DE MÓDULOS DE SOPORTE (Asignación de Cuerpos)
 -- =======================================================
 
-spawnPetModel = function(player, petName) 
-	local petModelTemplate = ReplicatedStorage:FindFirstChild(petName)
+spawnPetModel = function(player, petName)
+	-- OBTENER DATA DE CONFIGURACIÓN
+	local petData = PetManager.PetConfig[petName] 
+	local petModelTemplate = ReplicatedStorage:FindFirstChild(petData.ModelId) -- Usar ModelId
 
-	if not petModelTemplate then
-		warn("PetManager: Modelo de mascota '" .. petName .. "' no encontrado en ReplicatedStorage.")
-		return 
+	if not petModelTemplate or not petData then
+		warn("PetManager: Modelo o configuración de mascota '" .. petName .. "' no encontrado. ModelId: " .. tostring(petData and petData.ModelId))
+		return
 	end
 
 	despawnPetModel(player)
@@ -79,10 +105,10 @@ spawnPetModel = function(player, petName)
 	local petModel = petModelTemplate:Clone()
 	petModel.Parent = Workspace
 
-	if not petModel.PrimaryPart then 
+	if not petModel.PrimaryPart then
 		warn("PetManager: Modelo de mascota '" .. petName .. "' no tiene PrimaryPart asignada.")
 		petModel:Destroy()
-		return 
+		return
 	end
 
 	petModel.PrimaryPart.Anchored = true
@@ -90,8 +116,40 @@ spawnPetModel = function(player, petName)
 	local character = player.Character
 	if character and character:FindFirstChild("HumanoidRootPart") then
 		local root = character.HumanoidRootPart
-		petModel:SetPrimaryPartCFrame(root.CFrame * CFrame.new(0, FOLLOW_HEIGHT, FOLLOW_DISTANCE)) 
+		petModel:SetPrimaryPartCFrame(root.CFrame * CFrame.new(0, FOLLOW_HEIGHT, FOLLOW_DISTANCE))
 	end
+
+	-- ******************************************************
+	-- CÓDIGO DE ANIMACIÓN ESCALABLE
+	-- ******************************************************
+	local animId = petData.AnimationId
+
+	if animId and animId ~= "" then 
+		local animator = petModel:FindFirstChildOfClass("AnimationController")
+		if animator then
+			local animation = Instance.new("Animation")
+			animation.AnimationId = animId -- Usa el ID ESPECÍFICO de la configuración
+
+			local loader = animator:FindFirstChildOfClass("Animator")
+			if not loader then
+				loader = Instance.new("Animator")
+				loader.Parent = animator
+			end
+
+			-- ******************************************************
+			-- NOTA: Usamos el nombre del Asset para el rastreo en el despawn
+			-- ******************************************************
+			local trackName = animId:gsub("rbxassetid://", "Anim_")
+
+			local track = loader:LoadAnimation(animation)
+			track.Name = trackName 
+			track.Looped = true
+			track:Play()
+		else
+			warn("PetManager: Mascota animada '" .. petName .. "' no tiene AnimationController.")
+		end
+	end
+	-- ******************************************************
 
 	petModels[player] = petModel
 end

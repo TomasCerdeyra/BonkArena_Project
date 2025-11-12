@@ -1,24 +1,24 @@
--- Script: RewardManager (VERSION 2 - Aplicando Multiplicador Global de Mascotas)
+-- Script: RewardManager (VERSION FINAL - Corrección Matemática)
 
 local Players = game:GetService("Players")
-local ZoneManager = require(game.ServerScriptService.Modules.ZoneManager) -- RUTA ACTUALIZADA
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local ZoneManager = require(ServerScriptService.Modules.ZoneManager)
+local EnemyConfig = require(ServerScriptService.Modules.EnemyConfig)
 
 local RewardManager = {}
 
--- Constantes de Progresión
-local COIN_REWARD_BASE = 1 
-local XP_PER_KILL = 1 
 local BASE_XP_MULTIPLIER = 10 
 
 -- =======================================================
--- 1. LÓGICA DE SUBIDA DE NIVEL
+-- LÓGICA DE SUBIDA DE NIVEL
 -- =======================================================
 local function tryLevelUp(player)
 	local upgrades = player:FindFirstChild("Upgrades")
 	if not upgrades then return end
 
 	local playerLevel = upgrades:FindFirstChild("Level")
-	local playerXP = upgrades:FindFirstChild("XP")
+	local playerXP = upgrades:FindFirstChild("XP") 
 
 	if playerLevel and playerXP then
 		local currentLevel = playerLevel.Value
@@ -29,52 +29,82 @@ local function tryLevelUp(player)
 				playerXP.Value = playerXP.Value - xpNeeded
 				playerLevel.Value = playerLevel.Value + 1
 				xpNeeded = BASE_XP_MULTIPLIER * playerLevel.Value
-
-				print(player.Name .. " ha subido al Nivel " .. playerLevel.Value .. "!")
+				print(player.Name, "ha subido al Nivel", playerLevel.Value)
 			end
 		end
 	end
 end
 
 -- =======================================================
--- 2. FUNCIÓN PRINCIPAL: PROCESAR MUERTE DE ENEMIGO (CORREGIDO)
+-- FUNCIÓN PRINCIPAL
 -- =======================================================
-function RewardManager.processKill(player, zoneName, isCritical)
+function RewardManager.processKill(player, enemyModel, isCritical)
+
+	-- 1. SEGURIDAD
+	if not enemyModel then return end
+
+	-- 2. OBTENER DATOS DEL ENEMIGO
+	local enemyKey = enemyModel.Name
+	local enemyData = EnemyConfig[enemyKey]
+
+	if not enemyData then
+		-- Fallback seguro
+		enemyData = { BaseCoinReward = 1, BaseXpReward = 1 } 
+	end
+
 	local rewardMultiplier = isCritical and 2 or 1
 	local upgrades = player:FindFirstChild("Upgrades")
 	if not upgrades then return end
 
-	-- OBTENER MULTIPLICADOR GLOBAL DE MONEDAS (NUEVO: DE STAT DE MASCOTAS)
+	-- 3. OBTENER ZONA
+	local zoneTag = enemyModel:FindFirstChild("Zone")
+	local zoneName = zoneTag and zoneTag.Value
+
+	local zoneMultiplier = 1
+	if zoneName and ZoneManager.Zones[zoneName] then
+		zoneMultiplier = ZoneManager.Zones[zoneName].CoinMultiplier or 1
+	end
+
+	-- 4. MULTIPLICADOR DE MASCOTAS (¡CORREGIDO!)
 	local petMultiplierStat = upgrades:FindFirstChild("CoinMultiplier")
-	local petMultiplier = petMultiplierStat and petMultiplierStat.Value or 1.0
+	local petBonus = petMultiplierStat and petMultiplierStat.Value or 0 
+	-- Si el valor es 0.05, queremos multiplicar por 1.05
+	local totalPetMult = 1 + petBonus 
 
-	-- Obtener Multiplicadores de Zona
-	local zoneData = ZoneManager.Zones[zoneName]
-	local zoneMultiplier = zoneData and zoneData.CoinMultiplier or 1
+	-- 5. CÁLCULO FINAL (¡CORREGIDO!)
+	local baseCoin = tonumber(enemyData.BaseCoinReward) or 1
+	local baseXp = tonumber(enemyData.BaseXpReward) or 1
 
-	-- 1. CÁLCULO DE RECOMPENSA FINAL (Multiplicación por Mascota)
-	local finalCoinReward = math.floor(COIN_REWARD_BASE * zoneMultiplier * rewardMultiplier * petMultiplier) -- APLICA MULTIPLICADOR MASCOTA
-	local finalXPReward = XP_PER_KILL * rewardMultiplier
+	-- Fórmula: Base * Zona * Critico * (1 + Mascota)
+	local rawCoins = baseCoin * zoneMultiplier * rewardMultiplier * totalPetMult
 
-	-- 2. OTORGAR MONEDAS
+	-- math.max(1, ...) asegura que SIEMPRE ganes al menos 1 moneda
+	local finalCoinReward = math.max(1, math.floor(rawCoins))
+
+	local finalXPReward = math.max(1, math.floor(baseXp * rewardMultiplier))
+
+	-- 6. OTORGAR MONEDAS
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
 		local bonkCoins = leaderstats:FindFirstChild("BonkCoin")
 		if bonkCoins then
 			bonkCoins.Value = bonkCoins.Value + finalCoinReward
+			-- print("Ganaste: " .. finalCoinReward .. " monedas") -- Puedes descomentar esto si quieres verlo
 		end
 	end
 
-	-- 3. OTORGAR XP y VERIFICAR NIVEL
+	-- 7. OTORGAR XP
 	local playerXP = upgrades:FindFirstChild("XP")
 	if playerXP then
 		playerXP.Value = playerXP.Value + finalXPReward
 		tryLevelUp(player)
 	end
 
-	-- 4. NOTIFICAR AL ZONEMANAGER (para respawn de enemigos)
-	for i = 1, rewardMultiplier do
-		ZoneManager.enemyKilled(zoneName)
+	-- 8. RESPWAN
+	if zoneName then
+		for i = 1, rewardMultiplier do
+			ZoneManager.enemyKilled(zoneName)
+		end
 	end
 end
 

@@ -1,53 +1,137 @@
--- Script: StaffManager (VERSION 9 - Rotación Corregida del Báculo Equipado)
+-- Script: StaffManager (VERSION 10 - Con Daño y Críticos)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players") -- CRÍTICO: Definido correctamente para conexiones
+local Players = game:GetService("Players")
 
--- RemoteEvents (Deben existir en ReplicatedStorage)
+-- RemoteEvents
 local RequestStaffBuy = ReplicatedStorage:WaitForChild("RequestStaffBuy")
 local RequestEquipStaff = ReplicatedStorage:WaitForChild("RequestEquipStaff")
 
 -- REQUIRES
 local SoundHandler = require(ServerScriptService.Modules.SoundHandler)
 
--- Contenedor de modelos (Asegúrate que existen en ReplicatedStorage)
+-- Contenedores
 local StaffModelsContainer = ReplicatedStorage:WaitForChild("StaffModels") 
 local ProjectilesContainer = ReplicatedStorage:WaitForChild("Projectiles") 
 
 local module = {}
 
--- Tabla local para rastrear el modelo de báculo actualmente equipado
 local equippedStaffModels = {} 
-local isInitialized = false -- Para el control de GameHandler
+local isInitialized = false
 
+-- =======================================================
+-- CONFIGURACIÓN DE BÁCULOS (¡CON DAÑO!)
+-- =======================================================
 module.STAFFS = {
 	["BasicStaff"] = {
 		Name = "Báculo Básico",
 		Cost = 0,
 		AttackRate = 1.0, 
-		Damage = 1,
 		Range = 50,
 		CriticalChance = 0.05, 
+		Damage = 50, -- ¡NUEVO!
+		CriticalDamage = 2, -- ¡NUEVO! (2x de daño)
 		Projectile = "BasicMagicBall", 
 		ModelId = "BasicStaffModel", 
 		Multiplier = 1.0,
-		Description = "Cadencia: 1.0/s | Crítico: 5%" 
+		Description = "Cadencia: 1.0/s | Crítico: 5%" ,
+		C1Correction = CFrame.new(-0.3, 0, 0),
+		Angule = CFrame.Angles(math.rad(90), math.rad(0), math.rad(0)),
 	},
 	["EmberWand"] = {
 		Name = "Vara de Ascuas",
 		Cost = 500, 
 		AttackRate = 2.0, 
-		Damage = 1,
 		Range = 60,
 		CriticalChance = 0.10, 
+		Damage = 75, -- ¡NUEVO!
+		CriticalDamage = 2, -- ¡NUEVO!
 		Projectile = "BasicMagicBall", 
 		ModelId = "EmberWandModel", 
 		Multiplier = 1.0, 
-		Description = "Cadencia: 2.0/s | Crítico: 10%" 
+		Description = "Cadencia: 2.0/s | Crítico: 10%" ,
+		C1Correction = CFrame.new(0, -0.5, 0.5),
+		Angule = CFrame.Angles(math.rad(10), math.rad(0), math.rad(0))
+	},
+	["TunTunS"] = {
+		Name = "Baculo Tun Tun Sahur",
+		Cost = 500, 
+		AttackRate = 2.0, 
+		Range = 60,
+		CriticalChance = 0.10, 
+		Damage = 75, -- ¡NUEVO!
+		CriticalDamage = 2, -- ¡NUEVO!
+		Projectile = "BasicMagicBall", 
+		ModelId = "TunTunSModel", 
+		Multiplier = 1.0, 
+		Description = "Cadencia: 2.0/s | Crítico: 10%" ,
+		C1Correction = CFrame.new(-0.5, -0.5, 0),
+		Angule = CFrame.Angles(math.rad(60), math.rad(0), math.rad(0))
+	},
+	["Balerina"] = {
+		Name = "Baculo Balerina Capuchina",
+		Cost = 500, 
+		AttackRate = 2.0, 
+		Range = 60,
+		CriticalChance = 0.10, 
+		Damage = 75, -- ¡NUEVO!
+		CriticalDamage = 2, -- ¡NUEVO!
+		Projectile = "BasicMagicBall", 
+		ModelId = "BalerinaModel", 
+		Multiplier = 1.0, 
+		Description = "Cadencia: 2.0/s | Crítico: 10%" ,
+		C1Correction = CFrame.new(0,0, 0),
+		Angule = CFrame.Angles(math.rad(70), math.rad(0), math.rad(0))
+	},
+	["Bacu3"] = {
+		Name = "Bacu3",
+		Cost = 50, 
+		AttackRate = 2.0, 
+		Range = 60,
+		CriticalChance = 0.10, 
+		Damage = 75, -- ¡NUEVO!
+		CriticalDamage = 2, -- ¡NUEVO!
+		Projectile = "BasicMagicBall", 
+		ModelId = "bacu3", 
+		Multiplier = 1.0, 
+		Description = "Cadencia: 2.0/s | Crítico: 10%" ,
+		C1Correction = CFrame.new(0,0, 1),
+		Angule = CFrame.Angles(math.rad(40), math.rad(0), math.rad(0))
+	},
+	["Bacu4"] = {
+		Name = "Bacu4",
+		Cost = 50, 
+		AttackRate = 2.0, 
+		Range = 60,
+		CriticalChance = 0.10, 
+		Damage = 75, -- ¡NUEVO!
+		CriticalDamage = 2, -- ¡NUEVO!
+		Projectile = "BasicMagicBall", 
+		ModelId = "baculo4", 
+		Multiplier = 1.0, 
+		Description = "Cadencia: 2.0/s | Crítico: 10%" ,
+		C1Correction = CFrame.new(0,-0.5, 0),
+		Angule = CFrame.Angles(math.rad(60), math.rad(0), math.rad(0))
+	},
+	["Magic"] = {
+		Name = "BacuMagic",
+		Cost = 50, 
+		AttackRate = 2.0, 
+		Range = 60,
+		CriticalChance = 0.10, 
+		Damage = 75, -- ¡NUEVO!
+		CriticalDamage = 2, -- ¡NUEVO!
+		Projectile = "BasicMagicBall", 
+		ModelId = "magic", 
+		Multiplier = 1.0, 
+		Description = "Cadencia: 2.0/s | Crítico: 10%" ,
+		C1Correction = CFrame.new(0,-0.5, 0),
+		Angule = CFrame.Angles(math.rad(100), math.rad(0), math.rad(0))
 	},
 }
+-- =======================================================
 
 function module.getStaffData(staffName)
 	local staffData = module.STAFFS[staffName]
@@ -58,9 +142,6 @@ function module.getStaffData(staffName)
 	return staffData
 end
 
--- =======================================================
--- FUNCIÓN: Desequipar Modelo Visual
--- =======================================================
 local function unequipStaffModel(player)
 	if equippedStaffModels[player] then
 		equippedStaffModels[player]:Destroy()
@@ -68,50 +149,40 @@ local function unequipStaffModel(player)
 	end
 end
 
--- =======================================================
--- FUNCIÓN: Equipar Modelo Visual (CRÍTICO: Usando los contenedores)
--- =======================================================
 local function equipStaffModel(player, staffName)
-	local staffData = module.STAFFS[staffName]
-	-- ... (Código de verificación sin cambios)
+	local staffData = module.STAFFS[staffName] 
+
+	if not staffData or not staffData.C1Correction then
+		warn("StaffManager: Datos del báculo incompletos o falta C1Correction para: " .. staffName)
+		return
+	end
 
 	local staffModelTemplate = StaffModelsContainer:FindFirstChild(staffData.ModelId)
 	local character = player.Character
 
 	if not staffModelTemplate or not character then return end
 
-	-- 1. Limpiar cualquier báculo viejo
 	unequipStaffModel(player)
 
-	-- 2. Clonar y adjuntar
 	local staffClone = staffModelTemplate:Clone()
 	staffClone.Parent = character
 
-	-- 3. Crear el Weld para adjuntar a la mano derecha
 	local rightHand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
 	local handle = staffClone:FindFirstChild("Handle")
 
 	if rightHand and handle then
-
-		-- Detenemos la física del Handle (es solo una parte visual)
-		handle.CanCollide = false 
-
-		-- Creamos un JointInstance (Weld) en lugar de WeldConstraint para más control:
+		handle.CanCollide = false
 		local weldJoint = Instance.new("Weld")
 		weldJoint.Part0 = rightHand
 		weldJoint.Part1 = handle
-		weldJoint.C0 = CFrame.new(0, -0.5, 0) -- Posición relativa del RightHand
+		weldJoint.C0 = CFrame.new(0, 0, -1)
 
-		-- CRÍTICO: Corrección de la Rotación y Posición
-		-- Rotación del Handle: Girar 90 grados en el eje Z para que el báculo quede en la dirección de la mano (como si lo estuviera sujetando).
-		-- math.rad(-90) en Z lo gira a lo largo del brazo.
-		-- math.pi / 4 es una leve inclinación (45 grados) para que no esté perfectamente vertical.
+		local StaffPosition = CFrame.new(0, 0, 0)
+		local StaffRotation = staffData.Angule
+		local staffCorrection = staffData.C1Correction 
 
-		weldJoint.C1 = CFrame.new(0, -1.2, 0) * CFrame.Angles(0.8, 0, math.rad(0))
-
+		weldJoint.C1 = (StaffPosition * StaffRotation) * staffCorrection
 		weldJoint.Parent = handle
-
-		-- Añadimos el báculo al rastreador.
 		equippedStaffModels[player] = staffClone
 	else
 		warn("StaffManager: No se pudo adjuntar el báculo (falta RightHand o Handle).")
@@ -119,38 +190,35 @@ local function equipStaffModel(player, staffName)
 	end
 end
 
--- =======================================================
--- LÓGICA DE EQUIPAMIENTO (Toggle y Visual)
--- =======================================================
 local function handleEquipStaff(player, staffName)
 	local staffData = module.STAFFS[staffName]
 	local upgrades = player:FindFirstChild("Upgrades")
 	local staffInventory = player:FindFirstChild("StaffInventory")
 
 	if not staffData or not upgrades or not staffInventory then return end
-	if not staffInventory:FindFirstChild(staffName) then return end
+
+	if not staffInventory:FindFirstChild(staffName) then
+		warn("StaffManager: Jugador " .. player.Name .. " intentó equipar un báculo no poseído: " .. staffName)
+		return
+	end
 
 	local equippedStaffValue = upgrades:FindFirstChild("EquippedStaff")
+	if not equippedStaffValue then return end
 
-	-- Manejo del Toggie (Equipar/Desequipar)
 	if equippedStaffValue.Value == staffName then
-		equippedStaffValue.Value = "" -- Desequipar: Deja una cadena vacía
+		equippedStaffValue.Value = "" 
 		unequipStaffModel(player)
 		print("StaffManager: El jugador " .. player.Name .. " desequipó " .. staffName)
 		return
 	end
 
-	-- Equipar
 	if equippedStaffValue then
 		equippedStaffValue.Value = staffName
-		equipStaffModel(player, staffName)
+		equipStaffModel(player, staffName) 
 		print("StaffManager: El jugador " .. player.Name .. " equipó " .. staffName)
 	end
 end
 
--- =======================================================
--- LÓGICA DE COMPRA
--- =======================================================
 local function handleStaffBuy(player, staffName)
 	local staffData = module.STAFFS[staffName]
 	if not staffData then
@@ -165,22 +233,17 @@ local function handleStaffBuy(player, staffName)
 	local playerCoins = leaderstats.BonkCoin
 	local cost = staffData.Cost
 
-	-- 1. Verificar si ya lo posee
 	if staffInventory:FindFirstChild(staffName) then
 		print("StaffManager: El jugador " .. player.Name .. " ya posee " .. staffName)
 		return
 	end
 
-	-- 2. Verificar si tiene suficientes monedas
 	if playerCoins.Value >= cost then
-		-- 3. Restar monedas y añadir al inventario
 		playerCoins.Value = playerCoins.Value - cost
-
 		local newStaff = Instance.new("BoolValue")
 		newStaff.Name = staffName
 		newStaff.Value = true
 		newStaff.Parent = staffInventory
-
 		SoundHandler.playSound("Purchase", player.Character.PrimaryPart.Position)
 		print("StaffManager: El jugador " .. player.Name .. " compró " .. staffName)
 	else
@@ -189,21 +252,15 @@ local function handleStaffBuy(player, staffName)
 	end
 end
 
--- =======================================================
--- INICIALIZACIÓN (Llamada desde GameHandler)
--- =======================================================
 module.init = function()
 	if isInitialized then return end
 
-	-- 1. Conexiones de RemoteEvents
 	RequestStaffBuy.OnServerEvent:Connect(handleStaffBuy)
 	RequestEquipStaff.OnServerEvent:Connect(handleEquipStaff)
 
-	-- 2. Conexión de equipamiento visual al cargar el personaje
 	Players.PlayerAdded:Connect(function(player)
 		player.CharacterAdded:Connect(function(character)
 			local equippedStaffValue = player:FindFirstChild("Upgrades"):FindFirstChild("EquippedStaff")
-			-- Esperamos para asegurar la carga completa
 			task.wait(0.5) 
 			if equippedStaffValue.Value ~= "" then
 				equipStaffModel(player, equippedStaffValue.Value)
