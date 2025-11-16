@@ -26,6 +26,11 @@ local function initializeStats(player)
 	local playerXP = Instance.new("IntValue")
 	playerXP.Name = "XP"
 	playerXP.Parent = upgrades
+	
+	local maxXP = Instance.new("IntValue")
+	maxXP.Name = "MaxXP"
+	maxXP.Value = playerLevel.Value * 10 -- Valor inicial calculado
+	maxXP.Parent = upgrades
 
 	local coinMultiplierStat = Instance.new("NumberValue")
 	coinMultiplierStat.Name = "CoinMultiplier"
@@ -36,6 +41,12 @@ local function initializeStats(player)
 	equippedStaff.Name = "EquippedStaff"
 	equippedStaff.Value = "BasicStaff" -- Báculo inicial por defecto
 	equippedStaff.Parent = upgrades
+
+	-- Mascota Equipada (Para replicación)
+	local equippedPet = Instance.new("StringValue")
+	equippedPet.Name = "EquippedPet"
+	equippedPet.Value = "" -- Vacío significa "nada equipado"
+	equippedPet.Parent = upgrades
 
 	-- Carpeta para almacenar el inventario de mascotas (datos)
 	local petInventory = Instance.new("Folder")
@@ -64,7 +75,7 @@ local function onPlayerAdded(player)
 	local upgrades = player:FindFirstChild("Upgrades")
 	local petInventory = player:FindFirstChild("PetInventory")
 	local staffInventory = player:FindFirstChild("StaffInventory") -- Referencia al nuevo inventario
-
+	
 	if success and loadedData.PlayerData then
 		local data = loadedData.PlayerData
 
@@ -73,13 +84,22 @@ local function onPlayerAdded(player)
 			return 
 		end
 
-		-- Cargar PlayerData (Eliminando referencias antiguas)
+		-- Cargar PlayerData
 		leaderstats.BonkCoin.Value = data.BonkCoin or 0
-		-- ELIMINAMOS: FireRateLevel y CriticalChanceLevel
 		upgrades.Level.Value = data.Level or 1 
 		upgrades.XP.Value = data.XP or 0
 		upgrades.CoinMultiplier.Value = data.CoinMultiplier or 1.0 
-		upgrades.EquippedStaff.Value = data.EquippedStaff or "BasicStaff" -- NUEVO: Cargar báculo equipado
+		upgrades.EquippedStaff.Value = data.EquippedStaff or "BasicStaff" 
+		upgrades.EquippedPet.Value = data.EquippedPet or "" 
+
+		-- === AGREGAR ESTO: RECALCULAR MAXXP ===
+		-- Como el nivel cambió (ej: de 1 a 41), recalculamos la meta de XP
+		local maxXPVal = upgrades:FindFirstChild("MaxXP")
+		if maxXPVal then
+			-- La fórmula debe ser la misma que en RewardManager (Nivel * 10)
+			maxXPVal.Value = upgrades.Level.Value * 10
+		end
+		-- ======================================
 
 		print("PlayerData cargada para " .. player.Name)
 

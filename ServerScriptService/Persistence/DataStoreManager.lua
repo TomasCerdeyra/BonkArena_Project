@@ -81,7 +81,8 @@ function DataStoreManager.saveData(player)
 		-- CriticalChanceLevel ELIMINADO
 		Level = upgrades.Level.Value, 
 		XP = upgrades.XP.Value,
-		EquippedStaff = upgrades.EquippedStaff.Value -- NUEVO
+		EquippedStaff = upgrades.EquippedStaff.Value, -- NUEVO
+		EquippedPet = upgrades.EquippedPet.Value
 	}
 
 	-- Recopilación de PetInventory

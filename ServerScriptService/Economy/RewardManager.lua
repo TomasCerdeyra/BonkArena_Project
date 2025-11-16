@@ -28,7 +28,18 @@ local function tryLevelUp(player)
 			while playerXP.Value >= xpNeeded do
 				playerXP.Value = playerXP.Value - xpNeeded
 				playerLevel.Value = playerLevel.Value + 1
+
+				-- Recalcular XP necesaria
 				xpNeeded = BASE_XP_MULTIPLIER * playerLevel.Value
+
+				-- === AGREGAR ESTO ===
+				-- Actualizar el valor visible para el cliente
+				local maxXPVal = upgrades:FindFirstChild("MaxXP")
+				if maxXPVal then
+					maxXPVal.Value = xpNeeded
+				end
+				-- ====================
+
 				print(player.Name, "ha subido al Nivel", playerLevel.Value)
 			end
 		end
