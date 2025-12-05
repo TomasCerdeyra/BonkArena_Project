@@ -42,37 +42,40 @@ local managedEnemies = {}
 -- Función para actualizar la barra de vida (CON TEXTO)
 -- =======================================================
 local function updateHealthBar(healthBar, healthValue, maxHealthValue)
-	-- CÁLCULO DE PORCENTAJE (Para la barra visual)
+	-- 1. Verificación de existencia básica
+	if not healthBar or not healthBar.Parent then return end
+
+	-- 2. Verificación paso a paso (ROMPE LA CADENA DE ERRORES)
+	local background = healthBar:FindFirstChild("Background")
+	if not background then return end -- Si no hay fondo, paramos aquí
+
+	local bar = background:FindFirstChild("Bar")
+	if not bar then return end -- Si no hay barra, paramos aquí
+
+	-- 3. Si llegamos aquí, es seguro actualizar
 	local percentage = 0
 	if maxHealthValue > 0 then
 		percentage = healthValue / maxHealthValue
 	end
-	
-	-- 1. ACTUALIZAR LA BARRA VISUAL
-	local bar = healthBar:FindFirstChild("Background"):FindFirstChild("Bar")
-	if bar then
-		bar.Size = UDim2.new(percentage, 0, 1, 0)
-		
-		-- Lógica de color (Se mantiene)
-		if percentage <= 0.25 then
-			bar.BackgroundColor3 = COLOR_VIDA_BAJA
-		elseif percentage <= 0.6 then
-			bar.BackgroundColor3 = COLOR_VIDA_MEDIA
-		else
-			bar.BackgroundColor3 = COLOR_VIDA_ALTA
-		end
+
+	bar.Size = UDim2.new(percentage, 0, 1, 0)
+
+	-- Lógica de color
+	if percentage <= 0.25 then
+		bar.BackgroundColor3 = COLOR_VIDA_BAJA
+	elseif percentage <= 0.6 then
+		bar.BackgroundColor3 = COLOR_VIDA_MEDIA
+	else
+		bar.BackgroundColor3 = COLOR_VIDA_ALTA
 	end
-    
-    -- 2. ACTUALIZAR EL TEXTO DE VALOR (¡NUEVO!)
-    local textLabel = healthBar:FindFirstChild("HealthValueText")
-    if textLabel then
-        -- Asegurar que la vida actual no sea negativa (ej: -10)
-        local currentHealth = math.max(0, math.floor(healthValue))
-        local maxHealth = math.floor(maxHealthValue)
-        
-        -- Formato "Vida Actual / Vida Máxima"
-        textLabel.Text = currentHealth .. " / " .. maxHealth
-    end
+
+	-- Texto
+	local textLabel = healthBar:FindFirstChild("HealthValueText")
+	if textLabel then
+		local currentHealth = math.max(0, math.floor(healthValue))
+		local maxHealth = math.floor(maxHealthValue)
+		textLabel.Text = currentHealth .. " / " .. maxHealth
+	end
 end
 
 -- =======================================================

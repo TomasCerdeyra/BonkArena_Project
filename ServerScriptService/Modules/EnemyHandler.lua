@@ -94,9 +94,16 @@ function EnemyHandler.spawnEnemy(battleCenter, zoneName, enemyData)
 	-- Física
 	for _, part in ipairs(enemyClone:GetDescendants()) do
 		if part:IsA("BasePart") then
-			part.Anchored = true -- ¡SIEMPRE ANCHORED! La IA lo mueve con CFrame
-			part.CanCollide = false -- Evita que se choquen entre ellos
-			part.CanTouch = true
+			-- SI ES LA HITBOX (La PrimaryPart)
+			if part == enemyClone.PrimaryPart then
+				part.Anchored = false -- ¡NO ANCLADO! Necesita moverse con física
+				part.CanCollide = true -- Esta es la que choca
+			else
+				-- SI ES CUALQUIER OTRA PARTE VISUAL
+				part.Anchored = false -- Tampoco anclado, lo sujeta el WeldConstraint
+				part.CanCollide = false -- Solo visual, no choca
+			end
+			-- part.CanTouch = true -- (Opcional, depende de si usas eventos .Touched)
 		end
 	end
 

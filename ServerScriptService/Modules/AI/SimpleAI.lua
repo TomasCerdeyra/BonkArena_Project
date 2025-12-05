@@ -1,8 +1,8 @@
--- Script: ServerScriptService/Modules/AI/SimpleAI.lua (FIX COOLDOWN)
+-- Script: ServerScriptService/Modules/AI/SimpleAI.lua (MODERN PHYSICS FIX)
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local EnemyConfig = require(ServerScriptService.Modules.EnemyConfig)
+local EnemyConfig = require(game.ReplicatedStorage.Shared.Data.EnemyData)
 
 local SimpleAI = {}
 
@@ -12,10 +12,10 @@ local ATTACK_RANGE = 4
 local PATROL_RADIUS = 20
 local PATROL_MOVE_DURATION = 5
 
-local enemyStates = {} 
+local enemyStates = {}
 
 -- =======================================================
--- SISTEMA DE ANIMACIÓN
+-- SISTEMA DE ANIMACIÓN (SIN CAMBIOS)
 -- =======================================================
 local function playAnimation(enemy, animType, state, speedOverride)
 	local animId = state.Config[animType]
@@ -92,7 +92,7 @@ local function playAnimation(enemy, animType, state, speedOverride)
 end
 
 -- =======================================================
--- UPDATE LOOP
+-- UPDATE LOOP (CON CAMBIOS FÍSICOS)
 -- =======================================================
 function SimpleAI.update(enemy, dt)
 	if enemy:GetAttribute("IsDead") then return end
@@ -100,7 +100,15 @@ function SimpleAI.update(enemy, dt)
 	local primaryPart = enemy.PrimaryPart
 	if not primaryPart then return end
 
-	-- 1. INICIALIZAR
+	-- CAMBIO 1: Buscar LinearVelocity
+	local linearVelocity = primaryPart:FindFirstChild("LinearVelocity") or enemy:FindFirstChild("LinearVelocity", true)
+	if not linearVelocity then
+		-- Si no lo tiene, no podemos moverlo físicamente. Salimos.
+		warn("Enemigo " .. enemy.Name .. " sin LinearVelocity")
+		return
+	end
+
+	-- 1. INICIALIZAR (SIN CAMBIOS)
 	if not enemyStates[enemy] then
 		local config = nil
 		for _, data in pairs(EnemyConfig) do
@@ -112,9 +120,9 @@ function SimpleAI.update(enemy, dt)
 		if not config then config = { PatrolSpeed = 5, ChaseSpeed = 5 } end
 
 		enemyStates[enemy] = {
-			Status = "PATROL", 
+			Status = "PATROL",
 			NextPatrolTarget = primaryPart.Position,
-			Timer = 0, 
+			Timer = 0,
 			Config = config,
 			Tracks = {},
 			CurrentTrack = nil,
@@ -125,9 +133,10 @@ function SimpleAI.update(enemy, dt)
 
 	local rotationTag = enemy:FindFirstChild("RotationOffset")
 	local rotationOffsetDeg = (rotationTag and rotationTag.Value) or 0
-	local rotationOffsetCFrame = CFrame.Angles(0, math.rad(rotationOffsetDeg), 0)
+	-- (Esta variable ya no la usas directamente abajo, pero la dejo por si acaso)
+	-- local rotationOffsetCFrame = CFrame.Angles(0, math.rad(rotationOffsetDeg), 0) 
 
-	-- 2. BUSCAR JUGADOR
+	-- 2. BUSCAR JUGADOR (SIN CAMBIOS)
 	local closestPlayerTorso = nil
 	local minDistance = DETECTION_RANGE
 	local targetHumanoid = nil
@@ -148,22 +157,24 @@ function SimpleAI.update(enemy, dt)
 		end
 	end
 
-	-- 3. MÁQUINA DE ESTADOS
+	-- 3. MÁQUINA DE ESTADOS (PEQUEÑOS CAMBIOS PARA DETENER)
 	local targetPos = nil
 	local lookAtPos = nil
 	local speed = state.Config.PatrolSpeed or 6
 	local shouldMove = false
 	local animToPlay = "IdleAnim"
-	local animSpeed = 1 
+	local animSpeed = 1
 
 	if state.Timer > 0 then
 		state.Timer = state.Timer - dt
 		if state.Status == "TURN" or state.Status == "ATTACKING" then
+			-- CAMBIO 2: Detener físicamente si está bloqueado
+			linearVelocity.VectorVelocity = Vector3.new(0,0,0)
 			return -- Bloqueado
 		end
 	end
 
-	-- === REACTIVACIÓN DESPUÉS DE COOLDOWN (EL FIX) ===
+	-- === REACTIVACIÓN DESPUÉS DE COOLDOWN (EL FIX) === (SIN CAMBIOS)
 	if state.Status == "COOLDOWN" and state.Timer <= 0 then
 		state.Status = "CHASE"
 	end
@@ -181,12 +192,15 @@ function SimpleAI.update(enemy, dt)
 				-- ATACAR
 				state.Status = "ATTACKING"
 
+				-- CAMBIO 3: Detener físicamente para atacar
+				linearVelocity.VectorVelocity = Vector3.new(0,0,0)
+
 				local duration = playAnimation(enemy, "AttackAnim", state)
 
 				-- Bloquear movimiento (asegurar mínimo 0.5s)
 				local atkSpeed = state.Config.AttackAnimSpeed or 1
 				local realDuration = duration / atkSpeed
-				state.Timer = realDuration 
+				state.Timer = realDuration
 				if state.Timer < 0.5 then state.Timer = 0.5 end
 
 				-- Retrasar Daño
@@ -196,13 +210,13 @@ function SimpleAI.update(enemy, dt)
 					if enemy and enemy.Parent and targetHumanoid and targetHumanoid.Health > 0 then
 						local distNow = (targetHumanoid.RootPart.Position - enemy.PrimaryPart.Position).Magnitude
 						-- Margen de error para golpear
-						if distNow <= ATTACK_RANGE + 3 then 
+						if distNow <= ATTACK_RANGE + 3 then
 							local damage = state.Config.Damage or 10
 							targetHumanoid:TakeDamage(damage)
 						end
 					end
 				end)
-				return 
+				return
 
 			elseif distToTarget > ATTACK_RANGE then
 				-- PERSEGUIR
@@ -211,7 +225,7 @@ function SimpleAI.update(enemy, dt)
 				lookAtPos = Vector3.new(targetPos.X, primaryPart.Position.Y, targetPos.Z)
 				speed = state.Config.ChaseSpeed or 10
 				shouldMove = true
-				animToPlay = "RunAnim" 
+				animToPlay = "RunAnim"
 			else
 				-- Cerca pero en Cooldown (Esperando próximo golpe)
 				lookAtPos = Vector3.new(closestPlayerTorso.Position.X, primaryPart.Position.Y, closestPlayerTorso.Position.Z)
@@ -219,14 +233,14 @@ function SimpleAI.update(enemy, dt)
 			end
 		end
 
-		-- Al terminar ataque, pasar a Cooldown
+		-- Al terminar ataque, pasar a Cooldown (SIN CAMBIOS)
 		if state.Status == "ATTACKING" and state.Timer <= 0 then
 			state.Status = "COOLDOWN"
 			state.Timer = state.Config.AttackCooldown or 1.5 -- Tiempo entre ataques (ajusta esto si quieres que pegue más seguido)
 		end
 
 	else
-		-- PATRULLA
+		-- PATRULLA (SIN CAMBIOS)
 		state.Status = "PATROL"
 		if state.Timer <= 0 or (primaryPart.Position - state.NextPatrolTarget).Magnitude < 2 then
 			local angle = math.random() * 2 * math.pi
@@ -242,21 +256,49 @@ function SimpleAI.update(enemy, dt)
 		speed = state.Config.PatrolSpeed or 6
 	end
 
-	-- 4. MOVIMIENTO
+	-- =======================================================
+	-- 4. MOVIMIENTO FÍSICO (CORREGIDO PARA ALIGN ORIENTATION)
+	-- =======================================================
+
+	-- Buscamos el AlignOrientation
+	local alignOrientation = primaryPart:FindFirstChild("AlignOrientation") or enemy:FindFirstChild("AlignOrientation", true)
+
 	if shouldMove and targetPos then
+		-- Dirección horizontal
 		local dir = (targetPos - primaryPart.Position) * Vector3.new(1,0,1)
+
 		if dir.Magnitude > 0.1 then
 			dir = dir.Unit
-			local displacement = dir * speed * dt
-			local newPos = primaryPart.Position + displacement
-			local lookCFrame = CFrame.lookAt(newPos, lookAtPos)
-			enemy:SetPrimaryPartCFrame(lookCFrame * rotationOffsetCFrame)
+
+			-- 1. VELOCIDAD (LinearVelocity)
+			linearVelocity.VectorVelocity = Vector3.new(dir.X * speed, 0, dir.Z * speed)
+
+			-- 2. ROTACIÓN (Usando AlignOrientation en vez de CFrame)
+			if alignOrientation then
+				-- Calculamos hacia dónde debe mirar (solo en eje Y para que no se incline)
+				local lookCFrame = CFrame.lookAt(primaryPart.Position, lookAtPos)
+
+				-- Aplicamos la rotación deseada al AlignOrientation
+				-- Nota: Si usas RotationOffset, lo aplicamos aquí
+				alignOrientation.CFrame = lookCFrame * CFrame.Angles(0, math.rad(rotationOffsetDeg), 0)
+			else
+				-- Fallback por si borraste el AlignOrientation (esto causaría el bug de acostarse)
+				local targetCFrame = CFrame.lookAt(primaryPart.Position, lookAtPos) * CFrame.Angles(0, math.rad(rotationOffsetDeg), 0)
+				enemy:SetPrimaryPartCFrame(targetCFrame)
+			end
+		else
+			-- Llegó al destino, detener física
+			linearVelocity.VectorVelocity = Vector3.new(0,0,0)
 		end
 		playAnimation(enemy, animToPlay, state)
 	else
-		if lookAtPos then
+		-- Quieto, detener física
+		linearVelocity.VectorVelocity = Vector3.new(0,0,0)
+
+		if lookAtPos and alignOrientation then
+			-- Rotar aunque esté quieto
 			local lookCFrame = CFrame.lookAt(primaryPart.Position, lookAtPos)
-			enemy:SetPrimaryPartCFrame(lookCFrame * rotationOffsetCFrame)
+			alignOrientation.CFrame = lookCFrame * CFrame.Angles(0, math.rad(rotationOffsetDeg), 0)
 		end
 		playAnimation(enemy, "IdleAnim", state)
 	end
@@ -266,6 +308,14 @@ function SimpleAI.playDeathAnimation(enemy)
 	local state = enemyStates[enemy]
 	if not state then return end
 	if state.CurrentTrack then state.CurrentTrack:Stop(0.1) end
+
+	-- CAMBIO 5: Detener y desactivar física al morir
+	local linearVelocity = enemy.PrimaryPart:FindFirstChild("LinearVelocity") or enemy:FindFirstChild("LinearVelocity", true)
+	if linearVelocity then
+		linearVelocity.VectorVelocity = Vector3.new(0,0,0)
+		linearVelocity.Enabled = false
+	end
+
 	playAnimation(enemy, "DeathAnim", state)
 end
 

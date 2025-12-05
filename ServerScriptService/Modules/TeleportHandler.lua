@@ -1,121 +1,117 @@
--- Script: TeleportHandler (VERSION 14 - Carga Diferida y Retiro Seguro Corregido)
-
+-- Script: TeleportHandler (VERSIÓN LIMPIA - SOLO FÍSICA)
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UpdateStatus = ReplicatedStorage:WaitForChild("UpdateStatus")
 local ServerScriptService = game:GetService("ServerScriptService")
-local ZoneManager = require(ServerScriptService.Modules.ZoneManager) 
 
-local LobbyModel = Workspace:WaitForChild("Lobby")
-local LobbyFloor = LobbyModel:WaitForChild("LobbyFloor")
-local MediumArenaFloor = Workspace:WaitForChild("MediumArenaFloor")
-local ArenaFloor = Workspace:WaitForChild("ArenaFloor") 
+-- Datos
+local ZoneData = require(ReplicatedStorage.Shared.Data.ZoneData)
 
-local RetreatToLobby = ReplicatedStorage:WaitForChild("RetreatToLobby")
+-- Referencias Red
+local Network = ReplicatedStorage:WaitForChild("Network")
+local UpdateStatus = Network:WaitForChild("UpdateStatus")
+local RetreatToLobby = Network:WaitForChild("RetreatToLobby")
+-- (Borramos RequestTeleport porque ya no usamos la GUI de selección)
+
+-- Referencia al Lobby
+local LobbyFloor = Workspace:WaitForChild("Lobby"):WaitForChild("LobbyFloor") 
 
 local module = {}
-local EnemyHandler -- CRÍTICO: Carga diferida
+local EnemyHandler 
 
 local LOBBY_MESSAGE = "Estás en el Lobby, entra a un portal."
 
 -- ===================================================
--- FUNCIÓN ÚNICA: Teleporte a cualquier Zona (con verificación)
+-- TELEPORTE A ZONA (Usada por PhysicalPortalHandler)
 -- ===================================================
-function module.teleportToZone(player, zoneName)
+function module.teleportToZone(player, zoneID)
 	local character = player.Character
 	if not character then return end
 
-	local zoneData = ZoneManager.Zones[zoneName]
+	local zoneConfig = ZoneData[zoneID]
+
+	if not zoneConfig then
+		warn("TeleportHandler: Zona '" .. tostring(zoneID) .. "' no encontrada en ZoneData.")
+		return
+	end
+
+	-- Verificar Nivel
 	local upgrades = player:FindFirstChild("Upgrades")
 	if not upgrades then return end
-
 	local playerLevel = upgrades:FindFirstChild("Level").Value
+	local requiredLevel = zoneConfig.MinimumLevel or 0
 
-	if not zoneData then
-		warn("TeleportHandler: Zona '" .. zoneName .. "' no encontrada.")
+	if playerLevel < requiredLevel then
+		UpdateStatus:FireClient(player, "?? Nivel " .. requiredLevel .. " necesario.")
 		return
 	end
 
-	if playerLevel < zoneData.MinimumLevel then
-		UpdateStatus:FireClient(player,
-			"ERROR: Necesitas Nivel " .. zoneData.MinimumLevel .. " para acceder a " .. zoneName)
+	-- 3. Buscar el punto de destino físico
+	-- Ahora buscamos dentro de la carpeta "Arenas" para ser ordenados
+	local arenasFolder = Workspace:FindFirstChild("Arenas")
+	local targetFloor = arenasFolder and arenasFolder:FindFirstChild(zoneID)
+
+	-- Fallback: Si no está en la carpeta, buscamos en Workspace recursivamente (por si te olvidaste de mover alguna)
+	if not targetFloor then
+		targetFloor = Workspace:FindFirstChild(zoneID, true)
+	end
+
+	if not targetFloor then
+		warn("TeleportHandler: No se encontró el piso físico '" .. zoneID .. "' en Workspace.")
 		return
 	end
 
-	local targetFloorPart = zoneData.FloorPart
-	local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-
-	-- **CRÍTICO: Obtener la posición central de forma segura**
+	-- Calcular centro
 	local center
-	if targetFloorPart:IsA("Model") then
-		if targetFloorPart.PrimaryPart then
-			center = targetFloorPart.PrimaryPart.Position
+	if targetFloor:IsA("Model") then
+		if targetFloor.PrimaryPart then
+			center = targetFloor.PrimaryPart.Position
 		else
-			warn("TeleportHandler: Modelo '" .. zoneName .. "' no tiene PrimaryPart configurada.")
-			return
+			center = targetFloor:GetModelCFrame().Position
 		end
-	elseif targetFloorPart:IsA("BasePart") then
-		center = targetFloorPart.Position
-	else
-		warn("TeleportHandler: Objeto de zona '" .. zoneName .. "' no es ni Modelo ni BasePart.")
-		return
+	elseif targetFloor:IsA("BasePart") then
+		center = targetFloor.Position
 	end
 
-	if humanoidRootPart and center then
-		local ARENA_RADIUS = 70
-		local SPAWN_HEIGHT = 5 -- Usaremos la misma altura que ya tienes para el jugador
+	if center then
+		-- Teletransportar aleatoriamente dentro de la arena
+		local ARENA_RADIUS = 15 
+		local SPAWN_HEIGHT = 5
 
 		local angle = math.random() * 2 * math.pi
-		local offsetX = math.cos(angle) * ARENA_RADIUS
-		local offsetZ = math.sin(angle) * ARENA_RADIUS
+		local offsetX = math.cos(angle) * (math.random() * ARENA_RADIUS)
+		local offsetZ = math.sin(angle) * (math.random() * ARENA_RADIUS)
 
-		local arenaSpawnPos = Vector3.new(
-			center.X + offsetX,
-			center.Y + SPAWN_HEIGHT,
-			center.Z + offsetZ
-		)
+		local arenaSpawnPos = Vector3.new(center.X + offsetX, center.Y + SPAWN_HEIGHT, center.Z + offsetZ)
 
 		character:SetPrimaryPartCFrame(CFrame.new(arenaSpawnPos))
-		UpdateStatus:FireClient(player, " ")
-		print(player.Name .. " teletransportado a " .. zoneName)
+		UpdateStatus:FireClient(player, "?? " .. (zoneConfig.Name or zoneID))
+		print(player.Name .. " viajó a " .. zoneID)
 	end
 end
 
 -- ===================================================
--- TELEPORTE AL LOBBY (Mensaje Persistente)
+-- TELEPORTE AL LOBBY (Usada por el botón de Retirada)
 -- ===================================================
 function module.teleportToLobby(player)
-	-- CRÍTICO: Carga diferida de EnemyHandler
 	if not EnemyHandler then
 		EnemyHandler = require(ServerScriptService.Modules.EnemyHandler)
 	end
 
 	local character = player.Character
 	if character then
-
-		local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-		if humanoidRootPart then
-			local lobbySpawnPos = LobbyFloor.Position + Vector3.new(0, 5, 0)
-			character:SetPrimaryPartCFrame(CFrame.new(lobbySpawnPos))
-
-			UpdateStatus:FireClient(player, LOBBY_MESSAGE)
-		end
+		local lobbySpawnPos = LobbyFloor.Position + Vector3.new(0, 5, 0)
+		character:SetPrimaryPartCFrame(CFrame.new(lobbySpawnPos))
+		UpdateStatus:FireClient(player, LOBBY_MESSAGE)
 	end
 end
 
 -- ===================================================
--- CONEXIÓN AL CLIENTE (Recibe la solicitud de la GUI)
+-- CONEXIONES
 -- ===================================================
-local RequestTeleport = ReplicatedStorage:WaitForChild("RequestTeleport")
-RequestTeleport.OnServerEvent:Connect(function(player, zoneName)
-	module.teleportToZone(player, zoneName)
-end)
 
--- Conexión para el Botón de Retirada Segura
+-- Solo mantenemos la retirada, ya que la entrada ahora es por toque físico
 RetreatToLobby.OnServerEvent:Connect(function(player)
-	print("Recibido evento de Retiro Seguro para: " .. player.Name)
 	module.teleportToLobby(player) 
-	-- (GameHandler no es requerido aquí, VfxHandler o SoundHandler podrían añadirse)
 end)
 
 return module

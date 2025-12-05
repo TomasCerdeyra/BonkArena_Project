@@ -24,7 +24,7 @@ end
 local function onPlayerAdded(player)
 	-- Lógica de bienvenida
 	TeleportHandler.teleportToLobby(player)
-	local UpdateStatus = ReplicatedStorage:WaitForChild("UpdateStatus")
+	local UpdateStatus = ReplicatedStorage:WaitForChild("Network"):WaitForChild("UpdateStatus")
 	UpdateStatus:FireClient(player, "¡Bienvenido! Entra al portal para ir a la Torre.")
 	print("Jugador " .. player.Name .. " unido al Lobby.")
 end

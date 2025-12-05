@@ -1,35 +1,54 @@
--- Script: PetHubHandler (VERSION 4 - Usando Funciones Seguras de PetManager)
-
+-- Script: PetHubHandler (MODO GACHA)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local PetManager = require(game.ServerScriptService.Pets.PetManager)
-local UpdateStatus = ReplicatedStorage:WaitForChild("UpdateStatus")
+local ServerScriptService = game:GetService("ServerScriptService")
 
-local RequestIncubation = ReplicatedStorage:WaitForChild("RequestIncubation")
-local RequestEquipPet = ReplicatedStorage:WaitForChild("RequestEquipPet") 
+-- Módulos
+local PetManager = require(ServerScriptService.Pets.PetManager)
+local PetData = require(ReplicatedStorage.Shared.Data.PetData)
 
-local PetHubHandler = {}
+-- Red
+local Network = ReplicatedStorage:WaitForChild("Network")
+local RequestIncubation = Network:WaitForChild("RequestIncubation")
+local RequestEquipPet = Network:WaitForChild("RequestEquipPet")
+local UpdateStatus = Network:WaitForChild("UpdateStatus")
 
--- 1. Manejo de Incubación (Compra)
-RequestIncubation.OnServerEvent:Connect(function(player)
-	local success, message = PetManager.requestIncubation(player)
-	UpdateStatus:FireClient(player, message)
-end)
+-- =================================================================
+-- 1. INCUBACIÓN (Ahora devuelve datos al cliente)
+-- =================================================================
+RequestIncubation.OnServerInvoke = function(player)
+	-- Recibimos los 4 valores nuevos del manager
+	local success, petName, isDuplicate, refundAmount = PetManager.requestIncubation(player)
 
--- 2. Manejo de Equipamiento/Desequipamiento (CORREGIDO)
+	if success then
+		local petInfo = PetData[petName]
+
+		return {
+			Success = true,
+			PetName = petName,
+			Rarity = petInfo.Rarity or "Común",
+			Image = petInfo.Image,
+
+			-- Datos nuevos para la UI
+			IsDuplicate = isDuplicate,
+			RefundAmount = refundAmount
+		}
+	else
+		return {
+			Success = false,
+			Message = petName -- En caso de error, el 2do valor es el mensaje
+		}
+	end
+end
+
+-- =================================================================
+-- 2. EQUIPAR (Sigue siendo Evento normal)
+-- =================================================================
 RequestEquipPet.OnServerEvent:Connect(function(player, petName)
-	local petInventory = player:FindFirstChild("PetInventory")
-	if not petInventory then return end
-
-	-- Usamos la función segura del PetManager para verificar el estado
-	local isCurrentlyEquipped = PetManager.isPetEquipped(player, petName)
-
-	if isCurrentlyEquipped then
+	if PetManager.isPetEquipped(player, petName) then
 		PetManager.unequipPet(player, petName)
-		UpdateStatus:FireClient(player, petName .. " ha sido desequipada.")
 	else
 		PetManager.equipPet(player, petName)
-		UpdateStatus:FireClient(player, petName .. " ha sido equipada.")
 	end
 end)
 
-return PetHubHandler
+return {}

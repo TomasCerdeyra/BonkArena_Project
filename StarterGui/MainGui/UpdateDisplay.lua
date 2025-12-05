@@ -5,13 +5,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = game.Players.LocalPlayer
 local MarketplaceService = game:GetService("MarketplaceService")
 
-local UpdateStatus = ReplicatedStorage:WaitForChild("UpdateStatus")
-local OpenPetHub = ReplicatedStorage:WaitForChild("OpenPetHub") 
-local RequestIncubation = ReplicatedStorage:WaitForChild("RequestIncubation") 
+local Network = ReplicatedStorage:WaitForChild("Network")
+local UpdateStatus = Network:WaitForChild("UpdateStatus") -- Si lo moviste
+local OpenPetHub = Network:WaitForChild("OpenPetHub")
+local RequestIncubation = Network:WaitForChild("RequestIncubation")
 
 local Overlay = script.Parent:WaitForChild("Overlay") 
-local lobbyDisplay = Overlay:WaitForChild("LobbyDisplay") 
-local buyCoinsButton = Overlay:WaitForChild("Buy100Coins")
+local lobbyDisplay = Overlay:WaitForChild("LobbyDisplay")
 
 -- GUI de Mascotas 
 local PetHubGui = Player:WaitForChild("PlayerGui"):WaitForChild("PetHubGui")
@@ -38,12 +38,11 @@ UpdateStatus.OnClientEvent:Connect(onStatusUpdate)
 local function onBuyCoinsClicked() 
 	MarketplaceService:PromptProductPurchase(Player, PRODUCT_ID) 
 end
-buyCoinsButton.MouseButton1Click:Connect(onBuyCoinsClicked)
 
-local function onIncubatorClicked()
-	RequestIncubation:FireServer()
-end
-IncubatorButton.MouseButton1Click:Connect(onIncubatorClicked) 
+--local function onIncubatorClicked()
+	--RequestIncubation:FireServer()
+--end
+--IncubatorButton.MouseButton1Click:Connect(onIncubatorClicked) 
 
 -- =======================================================
 -- 3. CONEXIONES DE UI (Mascotas y Texto)

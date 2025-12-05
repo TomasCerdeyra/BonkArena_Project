@@ -37,13 +37,15 @@ local CATEGORIES = {
 		Name = "Báculos", 
 		Folder = "StaffInventory", 
 		EquipEvent = "RequestEquipStaff",
-		EquipVal = "EquippedStaff" -- Nombre del StringValue en Upgrades
+		EquipVal = "EquippedStaff", -- Nombre del StringValue en Upgrades
+		DataModule = "StaffData"
 	},
 	{ 
 		Name = "Mascotas", 
 		Folder = "PetInventory", 
 		EquipEvent = "RequestEquipPet",
-		EquipVal = "EquippedPet"
+		EquipVal = "EquippedPet",
+		DataModule = "PetData"
 	},
 	-- Futuro ejemplo:
 	-- { Name = "Sombreros", Folder = "HatInventory", EquipEvent = "RequestEquipHat", EquipVal = "EquippedHat" },
@@ -77,7 +79,7 @@ end
 -- =================================================================
 local function loadItems(categoryIndex)
 	currentCategoryIndex = categoryIndex
-	updateCategoryVisuals() -- Actualizar pestañas
+	updateCategoryVisuals() -- Actualizar pestañas visualmente
 
 	-- A. Limpiar grilla anterior
 	for _, item in ipairs(ItemsContainer:GetChildren()) do
@@ -86,65 +88,93 @@ local function loadItems(categoryIndex)
 		end
 	end
 
-	-- B. Obtener datos de la categoría actual
+	-- B. Obtener datos de la categoría
 	local catData = CATEGORIES[categoryIndex]
-	local inventoryFolder = Player:WaitForChild(catData.Folder)
-	local upgrades = Player:WaitForChild("Upgrades")
-	local equippedValue = upgrades:WaitForChild(catData.EquipVal)
 
-	-- C. Crear botón por cada objeto que tengas
-	local items = inventoryFolder:GetChildren()
-
-	if #items == 0 then
-		-- Opcional: Mostrar mensaje "Inventario Vacío"
+	-- --- VERIFICACIÓN DE SEGURIDAD (NUEVO) ---
+	if not catData.DataModule then
+		warn("InventoryController: Falta 'DataModule' en la configuración de " .. catData.Name)
+		return
 	end
 
+	-- Buscar la carpeta y el módulo con seguridad
+	local sharedData = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Data")
+	local dataModule = sharedData:FindFirstChild(catData.DataModule)
+
+	if not dataModule then
+		warn("InventoryController: No se encontró el archivo '" .. catData.DataModule .. "' en ReplicatedStorage/Shared/Data")
+		return
+	end
+
+	-- Cargar la información
+	local itemsInfo = require(dataModule)
+	if not itemsInfo then
+		warn("InventoryController: El módulo '" .. catData.DataModule .. "' no devolvió ninguna tabla (revisa el 'return').")
+		return
+	end
+	-- ----------------------------------------
+
+	local inventoryFolder = Player:FindFirstChild(catData.Folder)
+	if not inventoryFolder then return end -- Si no ha cargado aún
+
+	local upgrades = Player:WaitForChild("Upgrades")
+	local equippedValue = upgrades:FindFirstChild(catData.EquipVal)
+
+	-- C. Crear botones
+	local items = inventoryFolder:GetChildren()
+
 	for _, itemValue in ipairs(items) do
-		-- Clonamos la plantilla
+		-- 1. Buscar datos en la tabla cargada
+		local info = itemsInfo[itemValue.Name] -- AQUÍ DABA EL ERROR
+
+		-- 2. Filtro: Si el ítem no existe en la lista oficial, lo ignoramos (Fantasma)
+		if not info then
+			-- warn("Ocultando ítem desconocido o borrado: " .. itemValue.Name)
+			continue 
+		end
+
+		-- 3. Clonar Plantilla
 		local itemButton = Templates.ItemTemplate:Clone()
 		itemButton.Name = itemValue.Name
-		itemButton.Parent = ItemsContainer -- Lo metemos a la grilla
+		itemButton.Parent = ItemsContainer
 		itemButton.Visible = true
 
-		-- Ponemos el nombre
+		-- Texto
 		local nameLabel = itemButton:FindFirstChild("ItemName")
-		if nameLabel then nameLabel.Text = itemValue.Name end
+		if nameLabel then nameLabel.Text = info.Name end 
 
-		-- ¿Está equipado este ítem?
+		-- Imagen
+		if info.Image then
+			itemButton.Image = info.Image
+		else
+			itemButton.Image = "rbxassetid://13464502203" -- Interrogación por defecto
+		end
+
+		-- Estado Equipado
 		local statusLabel = itemButton:FindFirstChild("Status")
-		local isEquipped = (equippedValue.Value == itemValue.Name)
+		local isEquipped = (equippedValue and equippedValue.Value == itemValue.Name)
 
 		if isEquipped then
 			if statusLabel then statusLabel.Visible = true end
-			-- Borde verde para resaltar
 			local stroke = itemButton:FindFirstChild("UIStroke")
 			if stroke then stroke.Color = COLORS.Active end
 		else
 			if statusLabel then statusLabel.Visible = false end
 		end
 
-		-- Lógica al hacer Clic (Equipar)
+		-- Clic para Equipar
 		itemButton.MouseButton1Click:Connect(function()
-			-- Disparamos el evento al servidor
-			-- Nota: Asegúrate que tus eventos estén en ReplicatedStorage o en la carpeta Network
-			local event = ReplicatedStorage:FindFirstChild(catData.EquipEvent) 
-				or ReplicatedStorage:WaitForChild("Network"):FindFirstChild(catData.EquipEvent)
-
+			local event = ReplicatedStorage:WaitForChild("Network"):FindFirstChild(catData.EquipEvent)
 			if event then
 				event:FireServer(itemValue.Name)
-
-				-- Pequeño truco: Esperar un instante y recargar la lista para ver el cambio "Equipado"
-				task.wait(0.1)
+				task.wait(0.1) -- Breve espera para que el servidor procese
 				if isOpen and currentCategoryIndex == categoryIndex then
-					loadItems(categoryIndex)
+					loadItems(categoryIndex) -- Recargar visualmente
 				end
-			else
-				warn("No se encontró el evento: " .. catData.EquipEvent)
 			end
 		end)
 	end
 end
-
 -- =================================================================
 -- 4. INICIALIZAR CATEGORÍAS (Crear pestañas arriba)
 -- =================================================================

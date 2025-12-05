@@ -1,25 +1,16 @@
--- Script: PetManager (VERSION OPTIMIZADA - Solo Datos)
+-- Script: PetManager (FINAL - MODO GACHA)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
+-- Conexión a Data Compartida
+local PetData = require(ReplicatedStorage.Shared.Data.PetData)
+
 local PetManager = {}
 
--- Constantes
 PetManager.EGG_COST = 500 
+PetManager.PetConfig = PetData 
 
--- Configuración (Compartida con cliente idealmente, pero por ahora aquí)
-PetManager.PetConfig = {
-	["CommonRabbit"] = { Multiplier = 1.05, Chance = 0.50 }, 
-	["RareWolf"] = { Multiplier = 1.15, Chance = 0.30 },
-	["EpicDragon"] = { Multiplier = 1.30, Chance = 0.15 }, 
-	["TortugaConAlas"] = { Multiplier = 2.05, Chance = 0.05 },
-	["Pulpo"] = { Multiplier = 0.05, Chance = 0 },
-	["Hada"] = { Multiplier = 0.05, Chance = 0 },
-}
-
--- =======================================================
--- LÓGICA DE MULTIPLICADORES
--- =======================================================
+-- Función interna para recalcular stats
 local function recalculateMultiplier(player)
 	local upgrades = player:FindFirstChild("Upgrades")
 	if not upgrades then return end
@@ -30,7 +21,6 @@ local function recalculateMultiplier(player)
 	local totalMultiplier = 1.0
 
 	if equippedPetName ~= "" and PetManager.PetConfig[equippedPetName] then
-		-- Restamos 1.0 porque la base es 1.0 (ej: 1.05 -> aporta +0.05)
 		local petMult = PetManager.PetConfig[equippedPetName].Multiplier
 		totalMultiplier = totalMultiplier + (petMult - 1.0)
 	end
@@ -40,9 +30,6 @@ local function recalculateMultiplier(player)
 	end
 end
 
--- =======================================================
--- GESTIÓN PÚBLICA (Equipar/Desequipar)
--- =======================================================
 function PetManager.isPetEquipped(player, petName)
 	local upgrades = player:FindFirstChild("Upgrades")
 	local equippedVal = upgrades and upgrades:FindFirstChild("EquippedPet")
@@ -54,16 +41,12 @@ function PetManager.equipPet(player, petName)
 	local upgrades = player:FindFirstChild("Upgrades")
 
 	if not petInventory or not upgrades then return false end
-
-	-- Verificar si la tiene
 	if not petInventory:FindFirstChild(petName) then return false end
 
-	-- Actualizar valor replicado
 	local equippedVal = upgrades:FindFirstChild("EquippedPet")
-	equippedVal.Value = petName -- ¡Esto avisa al cliente automáticamente!
+	equippedVal.Value = petName 
 
 	recalculateMultiplier(player)
-	print(player.Name .. " equipó " .. petName)
 	return true
 end
 
@@ -74,17 +57,19 @@ function PetManager.unequipPet(player, petName)
 	local equippedVal = upgrades:FindFirstChild("EquippedPet")
 
 	if equippedVal.Value == petName then
-		equippedVal.Value = "" -- Desequipar
+		equippedVal.Value = "" 
 		recalculateMultiplier(player)
-		print(player.Name .. " desequipó " .. petName)
 		return true
 	end
 	return false
 end
 
--- =======================================================
--- INCUBACIÓN
--- =======================================================
+-- FUNCIÓN PRINCIPAL DE COMPRA
+-- En PetManager.lua
+
+-- Nueva constante (puedes ponerla arriba con EGG_COST)
+PetManager.DUPLICATE_REFUND = 150 -- Cuánto devuelves si sale repetida
+
 function PetManager.requestIncubation(player)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local petInventory = player:FindFirstChild("PetInventory")
@@ -96,40 +81,55 @@ function PetManager.requestIncubation(player)
 		return false, "Faltan Monedas"
 	end
 
+	-- 1. COBRAR (Primero cobramos el precio completo)
 	bonkCoins.Value = bonkCoins.Value - PetManager.EGG_COST
 
-	-- Sistema de Probabilidad (Gacha)
+	-- 2. SORTEO
 	local roll = math.random()
 	local cumulativeChance = 0
 	local chosenPet = "CommonRabbit"
-	local chosenData = PetManager.PetConfig["CommonRabbit"]
+	local chosenData = nil
 
 	for petName, data in pairs(PetManager.PetConfig) do
-		if data.Chance > 0 then
-			cumulativeChance = cumulativeChance + data.Chance
-			if roll <= cumulativeChance then
-				chosenPet = petName
-				chosenData = data
-				break
-			end
+		local chance = data.Chance or 0.1 
+		cumulativeChance = cumulativeChance + chance
+		if roll <= cumulativeChance then
+			chosenPet = petName
+			chosenData = data
+			break
+		end
+	end
+	if not chosenData then chosenData = PetManager.PetConfig[chosenPet] end
+
+	-- 3. VERIFICAR DUPLICADO
+	local isDuplicate = false
+	local refundAmount = 0
+
+	if petInventory:FindFirstChild(chosenPet) then
+		-- ¡YA LA TIENE! -> REEMBOLSO
+		isDuplicate = true
+		refundAmount = PetManager.DUPLICATE_REFUND
+
+		-- Devolver dinero
+		bonkCoins.Value = bonkCoins.Value + refundAmount
+		print(player.Name .. " sacó duplicado: " .. chosenPet .. ". Reembolso: " .. refundAmount)
+	else
+		-- ¡ES NUEVA! -> CREAR
+		local petValue = Instance.new("NumberValue") 
+		petValue.Name = chosenPet
+		petValue.Value = chosenData.Multiplier or 1
+		petValue.Parent = petInventory
+
+		-- Auto-equipar si no tiene nada
+		local upgrades = player:FindFirstChild("Upgrades")
+		if upgrades and upgrades.EquippedPet.Value == "" then
+			PetManager.equipPet(player, chosenPet)
 		end
 	end
 
-	-- Dar mascota
-	if not petInventory:FindFirstChild(chosenPet) then
-		local petValue = Instance.new("NumberValue") 
-		petValue.Name = chosenPet
-		petValue.Value = chosenData.Multiplier
-		petValue.Parent = petInventory
-	end
-
-	-- Auto-equipar si no tiene nada
-	local upgrades = player:FindFirstChild("Upgrades")
-	if upgrades and upgrades.EquippedPet.Value == "" then
-		PetManager.equipPet(player, chosenPet)
-	end
-
-	return true, "¡Obtuviste " .. chosenPet .. "!"
+	-- 4. DEVOLVER MÁS DATOS
+	-- Ahora devolvemos 3 cosas: Exito (true), Nombre, EsDuplicado, MontoReembolso
+	return true, chosenPet, isDuplicate, refundAmount
 end
 
 return PetManager

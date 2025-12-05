@@ -4,9 +4,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = game.Players.LocalPlayer
 
 -- RemoteEvents
-local OpenStaffShop = ReplicatedStorage:WaitForChild("OpenStaffShop") 
-local RequestStaffBuy = ReplicatedStorage:WaitForChild("RequestStaffBuy")
-local RequestEquipStaff = ReplicatedStorage:WaitForChild("RequestEquipStaff")
+local Network = ReplicatedStorage:WaitForChild("Network")
+local OpenStaffShop = Network:WaitForChild("OpenStaffShop") 
+local RequestStaffBuy = Network:WaitForChild("RequestStaffBuy")
+local RequestEquipStaff = Network:WaitForChild("RequestEquipStaff")
 
 -- GUI References (Asegúrate que coincidan con tu rediseño)
 local StaffShopGui = script.Parent
